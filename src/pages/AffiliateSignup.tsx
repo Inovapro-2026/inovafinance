@@ -78,7 +78,21 @@ export default function AffiliateSignup() {
 
         if (fetchError) throw fetchError;
 
-        const links: AffiliateLinkRecord[] = data?.value ? JSON.parse(data.value) : [];
+        if (!data?.value) {
+          setError("Nenhum link de afiliado configurado ainda.");
+          return;
+        }
+
+        // Handle both string and already-parsed object
+        let links: AffiliateLinkRecord[] = [];
+        try {
+          links = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+        } catch {
+          console.error("Failed to parse affiliate links:", data.value);
+          setError("Erro ao processar links de afiliado.");
+          return;
+        }
+
         const link = links.find(
           (l) => l.affiliate_code === code && l.is_active && !l.is_blocked
         );
