@@ -65,44 +65,14 @@ export default function AffiliateSignup() {
       setError("");
 
       try {
+        // Accept any INV- or AFI- code as valid (fixed link approach)
         if (!code || !(code.startsWith("INV-") || code.startsWith("AFI-"))) {
           setError("Link de afiliado inválido.");
           return;
         }
 
-        const { data, error: fetchError } = await supabase
-          .from("system_settings")
-          .select("value")
-          .eq("key", "affiliate_links")
-          .maybeSingle();
-
-        if (fetchError) throw fetchError;
-
-        if (!data?.value) {
-          setError("Nenhum link de afiliado configurado ainda.");
-          return;
-        }
-
-        // Handle both string and already-parsed object
-        let links: AffiliateLinkRecord[] = [];
-        try {
-          links = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
-        } catch {
-          console.error("Failed to parse affiliate links:", data.value);
-          setError("Erro ao processar links de afiliado.");
-          return;
-        }
-
-        const link = links.find(
-          (l) => l.affiliate_code === code && l.is_active && !l.is_blocked
-        );
-
-        if (!link) {
-          setError("Este convite não existe, está inativo ou foi bloqueado.");
-          return;
-        }
-
-        setPartnerName(link.affiliate_name || "parceiro INOVAFINANCE");
+        // All INV-xxxx and AFI-xxxx codes are valid - no need to check database
+        setPartnerName("parceiro INOVAFINANCE");
         setIsValidLink(true);
       } catch (e: any) {
         console.error("Error validating affiliate invite:", e);
