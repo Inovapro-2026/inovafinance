@@ -105,11 +105,19 @@ export default function Subscribe() {
       loadPrices();
     }
 
-    const code = searchParams.get('ref') || searchParams.get('affiliate');
+    const rawCode =
+      searchParams.get('ref') ||
+      searchParams.get('affiliate') ||
+      searchParams.get('code') ||
+      searchParams.get('invite') ||
+      searchParams.get('inv');
+
+    const code = rawCode ? decodeURIComponent(rawCode).trim() : null;
+
     if (code) {
       // Save ref to localStorage for persistence
       localStorage.setItem('inovafinance_affiliate_ref', code);
-      
+
       // Check if it's an admin-generated link (AFI-xxx or INV-xxx format)
       if (code.startsWith('AFI-') || code.startsWith('INV-')) {
         setAffiliateFromUrl(true);
@@ -234,9 +242,8 @@ export default function Subscribe() {
           // Use affiliate name if available, otherwise show generic partner message
           const partnerName = link.affiliate_name || 'um parceiro INOVAFINANCE';
           setAffiliateName(partnerName);
-          // Apply affiliate price
-          const newAmount = affiliatePrice - couponDiscount;
-          setSubscriptionAmount(Math.max(0.01, newAmount));
+          // Admin affiliate accounts are FREE (no PIX payment)
+          setSubscriptionAmount(0);
           toast({
             title: "Você foi indicado por um parceiro INOVAFINANCE",
             description: `Indicado por: ${partnerName}. Ao se cadastrar, você terá acesso ao programa de afiliados.`,
