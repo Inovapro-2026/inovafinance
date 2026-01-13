@@ -72,36 +72,45 @@ export function AdminAffiliateLinkGenerator() {
   };
 
   const saveLinks = async (newLinks: AffiliateLink[]) => {
-    try {
-      const { error } = await supabase
-        .from('system_settings')
-        .upsert({
-          key: 'affiliate_links',
-          value: JSON.stringify(newLinks),
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'key' });
-
-      if (error) throw error;
-      setLinks(newLinks);
-      
-      // Log admin action
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('admin_logs').insert({
-          admin_id: user.id,
-          action: 'affiliate_link_updated',
-          details: { links_count: newLinks.length }
-        });
-      }
-    } catch (error) {
-      console.error('Error saving affiliate links:', error);
-      throw error;
+    // Check if user is authenticated first
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Sessão expirada. Faça login novamente.');
     }
+
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'affiliate_links',
+        value: JSON.stringify(newLinks),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+
+    if (error) {
+      console.error('Error saving affiliate links:', error);
+      throw new Error(error.message || 'Erro ao salvar links');
+    }
+    
+    setLinks(newLinks);
+    
+    // Log admin action
+    await supabase.from('admin_logs').insert({
+      admin_id: user.id,
+      action: 'affiliate_link_updated',
+      details: { links_count: newLinks.length }
+    });
   };
 
   const generateLink = async () => {
     setIsGenerating(true);
     try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Sessão expirada. Faça login novamente.");
+        return;
+      }
+
       // Generate unique code (INV-XXXX format)
       const randomNum = Math.floor(1000 + Math.random() * 9000);
       const code = `INV-${randomNum}`;
@@ -127,8 +136,9 @@ export function AdminAffiliateLinkGenerator() {
       toast.success("Link gerado e copiado! Envie para o afiliado se cadastrar.", {
         duration: 5000,
       });
-    } catch (error) {
-      toast.error("Erro ao gerar link de afiliado");
+    } catch (error: any) {
+      console.error('Error generating affiliate link:', error);
+      toast.error(error?.message || "Erro ao gerar link de afiliado");
     } finally {
       setIsGenerating(false);
     }
