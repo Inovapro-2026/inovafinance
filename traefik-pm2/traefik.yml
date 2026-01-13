@@ -1,0 +1,31 @@
+# Configuração principal do Traefik
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+  traefik:
+    address: ":8080"
+
+providers:
+  file:
+    directory: /root/INOVAFINANCE/traefik-pm2/config/dynamic
+    watch: true
+
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: admin@inovapro.cloud
+      storage: /root/INOVAFINANCE/traefik-pm2/certs/acme.json
+      tlsChallenge: {}
+
+log:
+  level: INFO
+  filePath: /root/INOVAFINANCE/traefik-pm2/logs/traefik.log
+
+accessLog:
+  filePath: /root/INOVAFINANCE/traefik-pm2/logs/access.log

@@ -1,0 +1,51 @@
+# Configuração completa do Traefik com SSL para inovabank.inovapro.cloud
+http:
+  routers:
+    # Redirecionamento HTTP para HTTPS
+    inovabank-http-router:
+      rule: "Host(`inovabank.inovapro.cloud`)"
+      service: inovabank-service
+      entryPoints: [web]
+      middlewares: [redirect-to-https]
+      priority: 1
+    
+    # Router HTTPS para INOVABANK
+    inovabank-router:
+      rule: "Host(`inovabank.inovapro.cloud`)"
+      service: inovabank-service
+      entryPoints: [websecure]
+      tls: {certResolver: myresolver}
+      priority: 1
+    
+    # Router HTTPS para Kokoro TTS API
+    kokoro-tts-router:
+      rule: "Host(`inovabank.inovapro.cloud`) && PathPrefix(`/api/tts`)"
+      service: kokoro-tts-service
+      entryPoints: [websecure]
+      tls: {certResolver: myresolver}
+      priority: 50
+    
+    # Router HTTPS para Health Check
+    kokoro-health-router:
+      rule: "Host(`inovabank.inovapro.cloud`) && Path(`/health`)"
+      service: kokoro-tts-service
+      entryPoints: [websecure]
+      tls: {certResolver: myresolver}
+      priority: 100
+
+  services:
+    inovabank-service:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:8083"
+    
+    kokoro-tts-service:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:8082"
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true

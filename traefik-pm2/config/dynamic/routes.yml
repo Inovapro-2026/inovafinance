@@ -1,0 +1,96 @@
+http:
+  routers:
+    # HTTP to HTTPS Redirect
+    redirect-to-https:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`{host:.+}`)"
+      middlewares:
+        - redirectscheme
+      service: noop
+
+    # INOVABANK Router
+    inovabank-router:
+      rule: "Host(`inovabank.inovapro.cloud`)"
+      entryPoints:
+        - websecure
+      service: inovabank-service
+      tls:
+        certResolver: myresolver
+
+    
+
+    # ISA Frontend Router
+    isa-frontend-router:
+      rule: "Host(`isa.inovapro.cloud`)"
+      entryPoints:
+        - websecure
+      service: isa-frontend-service
+      tls:
+        certResolver: myresolver
+
+    # ISA Backend Router
+    isa-backend-router:
+      rule: "Host(`isa.inovapro.cloud`) && PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: isa-backend-service
+      tls:
+        certResolver: myresolver
+
+    # Hub Frontend Router
+    hub-frontend-router:
+      rule: "Host(`hub.inovapro.cloud`)"
+      entryPoints:
+        - websecure
+      service: hub-frontend-service
+      tls:
+        certResolver: myresolver
+
+    # Hub Backend Router
+    hub-backend-router:
+      rule: "Host(`hub.inovapro.cloud`) && PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: hub-backend-service
+      tls:
+        certResolver: myresolver
+
+  services:
+    inovabank-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:8083"
+    
+    
+    
+    isa-frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:9001"
+    
+    isa-backend-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3001"
+    
+    hub-frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3002"
+    
+    hub-backend-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3003"
+    
+    noop:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:9999"
+
+  middlewares:
+    redirectscheme:
+      redirectScheme:
+        scheme: https
+        permanent: true

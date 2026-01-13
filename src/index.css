@@ -1,0 +1,470 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* INOVA BANK Light Premium Theme - Fundo CINZA */
+    --background: 220 10% 88%;
+    --foreground: 0 0% 5%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 5%;
+
+    /* Roxo Inova - SUPER VIBRANTE */
+    --primary: 260 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Azul Tech - INTENSO */
+    --secondary: 217 100% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 10% 88%;
+    --muted-foreground: 220 15% 35%;
+
+    --accent: 260 100% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Vermelho SUPER FORTE */
+    --destructive: 0 100% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Verde SUPER FORTE */
+    --success: 145 100% 30%;
+    --success-foreground: 0 0% 100%;
+
+    /* Laranja SUPER FORTE */
+    --warning: 35 100% 50%;
+    --warning-foreground: 0 0% 5%;
+
+    --border: 220 15% 75%;
+    --input: 220 13% 91%;
+    --ring: 260 100% 50%;
+
+    --radius: 1rem;
+
+    /* Glass morphism tokens - light version */
+    --glass-bg: 0 0% 100%;
+    --glass-border: 220 13% 91%;
+    --glass-blur: 20px;
+
+    /* Gradients - INTENSOS */
+    --gradient-primary: linear-gradient(135deg, hsl(260 100% 50%) 0%, hsl(217 100% 50%) 100%);
+    --gradient-light: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 14% 96%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(260 100% 50% / 0.2) 0%, transparent 70%);
+
+    /* Shadows - FORTES */
+    --shadow-glow: 0 0 50px hsl(260 100% 50% / 0.25);
+    --shadow-card: 0 6px 28px hsl(220 13% 20% / 0.12);
+    --shadow-float: 0 14px 40px hsl(220 13% 20% / 0.16);
+
+    /* Sidebar tokens */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 5%;
+    --sidebar-primary: 260 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 0 0% 5%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 260 100% 50%;
+  }
+
+  .dark {
+    --background: 222 47% 5%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 254 90% 67%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217 100% 65%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 222 47% 12%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 254 90% 67%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 5%;
+
+    --border: 222 47% 15%;
+    --input: 222 47% 12%;
+    --ring: 254 90% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply text-foreground;
+    background: hsl(var(--background));
+    font-weight: 600;
+    color: hsl(0 0% 0%);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    color: hsl(0 0% 0%);
+  }
+
+  p, span, label, div {
+    font-weight: 600;
+    color: inherit;
+  }
+
+  /* Inputs should have normal weight for user typing */
+  input, textarea, select {
+    font-weight: 500;
+  }
+
+  /* Buttons stay bold */
+  button {
+    font-weight: 600;
+  }
+}
+
+@layer components {
+  /* Solid White Card Style */
+  .glass-card {
+    @apply relative overflow-hidden rounded-2xl border border-border;
+    background: hsl(0 0% 100%);
+    box-shadow: 0 4px 24px hsl(220 13% 20% / 0.1);
+  }
+
+  /* Remove pseudo element that may cause transparency */
+  .glass-card::before {
+    display: none;
+  }
+
+  /* Force solid text colors in cards */
+  .glass-card h1, .glass-card h2, .glass-card h3, .glass-card h4, .glass-card h5, .glass-card h6 {
+    font-weight: 700 !important;
+    color: hsl(0 0% 0%) !important;
+    opacity: 1 !important;
+  }
+
+  .glass-card p, .glass-card span, .glass-card div, .glass-card label {
+    font-weight: 600;
+    color: hsl(0 0% 0%);
+    opacity: 1;
+  }
+
+  .glass-card .text-muted-foreground {
+    color: hsl(220 15% 35%) !important;
+    font-weight: 600;
+    opacity: 1 !important;
+  }
+
+  /* CORES VIBRANTES E FORTES */
+  .text-primary {
+    color: hsl(260 100% 45%) !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+  }
+
+  .text-success {
+    color: hsl(145 100% 28%) !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+  }
+
+  .text-destructive {
+    color: hsl(0 100% 40%) !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+  }
+
+  .text-secondary {
+    color: hsl(217 100% 45%) !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+  }
+
+  .text-warning {
+    color: hsl(35 100% 40%) !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(254 85% 58%) 0%, hsl(217 91% 60%) 100%);
+  }
+
+  /* Glow Effect */
+  .glow-primary {
+    box-shadow: 0 0 40px hsl(254 85% 58% / 0.2), 0 0 80px hsl(254 85% 58% / 0.1);
+  }
+
+  .glow-success {
+    box-shadow: 0 0 30px hsl(142 71% 45% / 0.2);
+  }
+
+  /* Animated Gradient Text */
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .animate-gradient {
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  /* Animated Gradient Border */
+  .gradient-border {
+    @apply relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    @apply absolute -inset-[1px] rounded-2xl;
+    background: linear-gradient(135deg, hsl(254 85% 58%) 0%, hsl(217 91% 60%) 50%, hsl(254 85% 58%) 100%);
+    z-index: -1;
+    opacity: 0.3;
+  }
+
+  /* Floating Navigation - Light */
+  .floating-nav {
+    @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-50;
+    @apply flex items-center gap-2 px-6 py-3 rounded-full;
+    background: hsl(0 0% 100%);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(220 13% 91%);
+    box-shadow: 0 8px 32px hsl(220 13% 20% / 0.12);
+  }
+
+  /* Numeric Keypad Button - Light */
+  .keypad-btn {
+    @apply w-20 h-20 rounded-full flex items-center justify-center text-2xl;
+    @apply transition-all duration-200 active:scale-95;
+    background: hsl(220 14% 96%);
+    border: 1px solid hsl(220 13% 91%);
+    color: hsl(0 0% 0%);
+    font-weight: 700;
+  }
+
+  .keypad-btn:hover {
+    background: hsl(220 14% 93%);
+  }
+
+  .keypad-btn:active {
+    background: linear-gradient(135deg, hsl(254 85% 58% / 0.1) 0%, hsl(220 14% 96%) 100%);
+  }
+
+  /* 3D Card Styles */
+  .card-3d-container {
+    perspective: 1000px;
+  }
+
+  .card-3d {
+    transform-style: preserve-3d;
+    transition: transform 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .card-3d.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .card-3d-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .card-3d-back {
+    transform: rotateY(180deg);
+  }
+
+  /* Progress Bar Glow - NO opacity animation */
+  .progress-glow {
+    @apply relative overflow-hidden rounded-full;
+  }
+
+  /* Wave Animation for AI */
+  .wave-bar {
+    @apply w-1 bg-primary rounded-full;
+    animation: wave 1.2s ease-in-out infinite;
+  }
+
+  .wave-bar:nth-child(1) { animation-delay: 0s; }
+  .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+  .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+  .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+  .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+
+  /* AI Tech Card - Light - SOLID */
+  .ai-tech-card {
+    @apply relative overflow-hidden rounded-3xl;
+    background: hsl(0 0% 100%);
+    border: 1px solid hsl(254 85% 58% / 0.2);
+    box-shadow: 0 8px 32px hsl(254 85% 58% / 0.08);
+  }
+
+  .ai-tech-card::before {
+    display: none;
+  }
+
+  /* Pulsing Ring */
+  .pulse-ring {
+    @apply absolute rounded-full border-2 border-primary/30;
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Orbit Animation */
+  .orbit {
+    animation: orbit 8s linear infinite;
+  }
+
+  .orbit-reverse {
+    animation: orbit 10s linear infinite reverse;
+  }
+
+  /* Grid Pattern */
+  .grid-pattern {
+    background-image: 
+      linear-gradient(hsl(254 85% 58% / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(254 85% 58% / 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  /* Scanning Line */
+  .scan-line {
+    @apply absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent;
+    animation: scan 3s ease-in-out infinite;
+  }
+
+  /* AI Brain Pulse - NO opacity changes */
+  .brain-pulse {
+    animation: brain-pulse 2s ease-in-out infinite;
+  }
+
+  /* Particle */
+  .particle {
+    @apply absolute w-1 h-1 bg-primary/40 rounded-full;
+    animation: particle-float 4s ease-in-out infinite;
+  }
+
+  /* Bento Grid */
+  .bento-grid {
+    @apply grid gap-4;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bento-item-large {
+    @apply col-span-2;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* KEYFRAMES - Sem alteração de opacidade em textos */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes wave {
+  0%, 100% { height: 8px; }
+  50% { height: 32px; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes scan {
+  0%, 100% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes brain-pulse {
+  0%, 100% { 
+    transform: scale(1); 
+    filter: drop-shadow(0 0 10px hsl(254 85% 58% / 0.3));
+  }
+  50% { 
+    transform: scale(1.05); 
+    filter: drop-shadow(0 0 20px hsl(254 85% 58% / 0.5));
+  }
+}
+
+@keyframes particle-float {
+  0%, 100% { 
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { 
+    transform: translateY(-100px) translateX(20px);
+    opacity: 0;
+  }
+}
+
+/* Scrollbar Styling - Light */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(220 14% 96%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(254 85% 58% / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(254 85% 58% / 0.5);
+}

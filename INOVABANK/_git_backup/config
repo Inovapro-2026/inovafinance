@@ -1,0 +1,16 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = https://github.com/Inovapro-2026/inova-finance-hub.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	vscode-merge-base = origin/main
+[remote "inovapro"]
+	url = https://github.com/Inovapro-2026/inova-finance-hub.git
+	fetch = +refs/heads/*:refs/remotes/inovapro/*
+[remote "target"]
+	url = https://github.com/Inovapro-2026/inovabank
+	fetch = +refs/heads/*:refs/remotes/target/*

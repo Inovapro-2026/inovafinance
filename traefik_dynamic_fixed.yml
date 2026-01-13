@@ -1,0 +1,50 @@
+http:
+  routers:
+    # HTTP to HTTPS Redirect
+    web-router:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`{host:.+}`)"
+      middlewares:
+        - redirect-to-https
+      service: noop-service
+
+    # Inovabank Router (HTTPS)
+    inovabank-https-router:
+      rule: "Host(`inovabank.inovapro.cloud`)"
+      service: inovabank-service
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: myresolver
+
+    # Kokoro TTS Router (HTTPS)
+    kokoro-tts-router:
+      rule: "Host(`inovabank.inovapro.cloud`) && PathPrefix(`/api/tts`)"
+      service: kokoro-tts-service
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: myresolver
+
+  services:
+    inovabank-service:
+      loadBalancer:
+        servers:
+          - url: "http://148.230.76.60:8083"
+    
+    kokoro-tts-service:
+      loadBalancer:
+        servers:
+          - url: "http://148.230.76.60:8082"
+    
+    noop-service:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.0.1" # Dummy URL, won't be hit due to redirect
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true

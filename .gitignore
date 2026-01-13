@@ -1,0 +1,11 @@
+node_modules/
+**/node_modules/
+venv/
+**/.git/
+dist/
+.DS_Store
+*.log
+acme.json
+/root/INOVAFINANCE/INOVABANK/dist/
+traefik-pm2/traefik
+/traefik-pm2/traefik

@@ -1,0 +1,7 @@
+{
+  "name": "INOVAFINANCE",
+  "description": "Aplicativo PWA de controle financeiro tecnológico com IA e voz.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
