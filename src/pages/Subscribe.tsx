@@ -451,8 +451,9 @@ export default function Subscribe() {
       const voiceLimitAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2 hours from now
       const trialEndDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
 
-      // Create user with FREE_TRIAL status
+      // Create user with FREE_TRIAL status for admin affiliates (no subscription required)
       // If coming from admin affiliate link, activate affiliate mode with PIX key
+      // Admin affiliates don't pay - account is free but deactivates in 7 days without sales
       const { error: insertError } = await supabase
         .from('users_matricula')
         .insert({
@@ -469,14 +470,15 @@ export default function Subscribe() {
           salary_day: parseInt(salaryDay) || 5,
           advance_amount: parseCurrency(advanceAmount),
           advance_day: advanceDay ? parseInt(advanceDay) : null,
-          user_status: 'approved', // Auto-approved for trial
+          user_status: 'approved', // Auto-approved for affiliate
           blocked: false,
-          subscription_type: 'FREE_TRIAL',
-          subscription_status: 'trial',
-          trial_started_at: now,
-          trial_voice_limit_at: voiceLimitAt,
+          // Admin affiliates get permanent access (no subscription needed)
+          subscription_type: isAdminAffiliateLink ? 'AFFILIATE_FREE' : 'FREE_TRIAL',
+          subscription_status: isAdminAffiliateLink ? 'active' : 'trial',
+          trial_started_at: isAdminAffiliateLink ? null : now,
+          trial_voice_limit_at: isAdminAffiliateLink ? null : voiceLimitAt,
           subscription_start_date: now,
-          subscription_end_date: trialEndDate,
+          subscription_end_date: isAdminAffiliateLink ? null : trialEndDate, // No end date for affiliates
           // Activate affiliate mode if coming from admin link
           is_affiliate: isAdminAffiliateLink,
           affiliate_code: isAdminAffiliateLink ? newMatricula.toString() : null,
@@ -484,6 +486,11 @@ export default function Subscribe() {
           // Save PIX key for affiliate payouts
           pix_key: isAdminAffiliateLink ? pixKey.trim() : null,
           pix_key_type: isAdminAffiliateLink ? pixKeyType : null,
+          // Mark as admin-created affiliate for 7-day rule tracking
+          is_admin_affiliate: isAdminAffiliateLink,
+          admin_affiliate_created_at: isAdminAffiliateLink ? now : null,
+          last_affiliate_sale_at: null,
+          affiliate_deactivated_at: null,
         } as any);
 
       if (insertError) throw insertError;

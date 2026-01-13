@@ -162,10 +162,18 @@ export const affiliateService = {
 
         if (commError) throw commError;
 
-        // 4. Update inviter balance
+        // 4.5. Update affiliate's last sale timestamp (resets 7-day counter)
+        await supabase
+            .from('users_matricula')
+            .update({
+                last_affiliate_sale_at: new Date().toISOString()
+            })
+            .eq('matricula', invite.inviter_matricula);
+
+        // 5. Update inviter balance (both initial_balance and affiliate_balance)
         const { data: currentBalanceData, error: balError } = await supabase
             .from('users_matricula')
-            .select('initial_balance')
+            .select('initial_balance, affiliate_balance')
             .eq('matricula', invite.inviter_matricula)
             .single();
 
@@ -175,7 +183,8 @@ export const affiliateService = {
         const { error: finalBalError } = await supabase
             .from('users_matricula')
             .update({
-                initial_balance: (Number(currentBalance.initial_balance) || 0) + commissionAmount
+                initial_balance: (Number(currentBalance.initial_balance) || 0) + commissionAmount,
+                affiliate_balance: (Number(currentBalance.affiliate_balance) || 0) + commissionAmount
             })
             .eq('matricula', invite.inviter_matricula);
 
