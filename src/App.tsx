@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Cadastros from "./pages/Cadastros";
 import Subscribe from "./pages/Subscribe";
+import AffiliateSignup from "./pages/AffiliateSignup";
 import PaymentCallback from "./pages/PaymentCallback";
 import Card from "./pages/Card";
 import Transactions from "./pages/Transactions";
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/cadastros" element={<Cadastros />} />
         <Route path="/subscribe" element={<Subscribe />} />
+        <Route path="/affiliate-signup" element={<AffiliateSignup />} />
         <Route path="/payment-callback" element={<PaymentCallback />} />
         <Route path="/" element={<Index />} />
         <Route path="/card" element={<Card />} />

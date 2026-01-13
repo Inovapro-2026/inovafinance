@@ -118,7 +118,7 @@ export function AdminAffiliateLinkGenerator() {
       const newLink: AffiliateLink = {
         id: crypto.randomUUID(),
         affiliate_code: code,
-        affiliate_link: `${baseUrl}/subscribe?ref=${code}`,
+        affiliate_link: `${baseUrl}/affiliate-signup?ref=${code}`,
         commission_percent: 50, // Fixed 50% commission
         is_active: true,
         created_at: new Date().toISOString(),
