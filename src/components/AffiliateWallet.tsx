@@ -90,7 +90,8 @@ export function AffiliateWallet({ userId, affiliateBalance, onBalanceUpdate }: A
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
+      // First, insert the withdrawal request
+      const { data: withdrawal, error } = await supabase
         .from('affiliate_withdrawals')
         .insert({
           affiliate_matricula: userId,
@@ -98,11 +99,36 @@ export function AffiliateWallet({ userId, affiliateBalance, onBalanceUpdate }: A
           pix_key: pixKey.trim(),
           pix_key_type: pixKeyType,
           status: 'pending',
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      toast.success('Solicitação de saque enviada!');
+      // Process the withdrawal automatically via edge function
+      toast.info('Processando seu saque via PIX...');
+      
+      try {
+        const response = await fetch(`https://pahvovxnhqsmcnqncmys.supabase.co/functions/v1/process-affiliate-withdrawal`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ withdrawalId: withdrawal.id }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          toast.success('🎉 Saque processado! PIX enviado para sua conta.');
+        } else {
+          toast.info('Saque registrado. Será processado em breve.');
+        }
+      } catch (processError) {
+        console.error('Error processing withdrawal:', processError);
+        toast.info('Saque registrado. Será processado manualmente.');
+      }
+
       setShowModal(false);
       setPixKey('');
       loadWithdrawals();

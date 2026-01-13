@@ -139,6 +139,7 @@ export type Database = {
           id: string
           notes: string | null
           pix_key: string | null
+          pix_key_type: string | null
           processed_at: string | null
           processed_by: string | null
           requested_at: string
@@ -151,6 +152,7 @@ export type Database = {
           id?: string
           notes?: string | null
           pix_key?: string | null
+          pix_key_type?: string | null
           processed_at?: string | null
           processed_by?: string | null
           requested_at?: string
@@ -163,6 +165,7 @@ export type Database = {
           id?: string
           notes?: string | null
           pix_key?: string | null
+          pix_key_type?: string | null
           processed_at?: string | null
           processed_by?: string | null
           requested_at?: string
@@ -670,10 +673,12 @@ export type Database = {
       }
       users_matricula: {
         Row: {
+          admin_affiliate_created_at: string | null
           advance_amount: number | null
           advance_day: number | null
           affiliate_balance: number | null
           affiliate_code: string | null
+          affiliate_deactivated_at: string | null
           birth_date: string | null
           blocked: boolean | null
           cpf: string | null
@@ -687,7 +692,9 @@ export type Database = {
           has_credit_card: boolean | null
           id: string
           initial_balance: number | null
+          is_admin_affiliate: boolean | null
           is_affiliate: boolean | null
+          last_affiliate_sale_at: string | null
           matricula: number
           payment_proof_url: string | null
           phone: string | null
@@ -704,10 +711,12 @@ export type Database = {
           user_status: Database["public"]["Enums"]["user_status"]
         }
         Insert: {
+          admin_affiliate_created_at?: string | null
           advance_amount?: number | null
           advance_day?: number | null
           affiliate_balance?: number | null
           affiliate_code?: string | null
+          affiliate_deactivated_at?: string | null
           birth_date?: string | null
           blocked?: boolean | null
           cpf?: string | null
@@ -721,7 +730,9 @@ export type Database = {
           has_credit_card?: boolean | null
           id?: string
           initial_balance?: number | null
+          is_admin_affiliate?: boolean | null
           is_affiliate?: boolean | null
+          last_affiliate_sale_at?: string | null
           matricula: number
           payment_proof_url?: string | null
           phone?: string | null
@@ -738,10 +749,12 @@ export type Database = {
           user_status?: Database["public"]["Enums"]["user_status"]
         }
         Update: {
+          admin_affiliate_created_at?: string | null
           advance_amount?: number | null
           advance_day?: number | null
           affiliate_balance?: number | null
           affiliate_code?: string | null
+          affiliate_deactivated_at?: string | null
           birth_date?: string | null
           blocked?: boolean | null
           cpf?: string | null
@@ -755,7 +768,9 @@ export type Database = {
           has_credit_card?: boolean | null
           id?: string
           initial_balance?: number | null
+          is_admin_affiliate?: boolean | null
           is_affiliate?: boolean | null
+          last_affiliate_sale_at?: string | null
           matricula?: number
           payment_proof_url?: string | null
           phone?: string | null

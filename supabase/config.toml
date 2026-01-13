@@ -1,1 +1,25 @@
 project_id = "pahvovxnhqsmcnqncmys"
+
+[functions.check-payment-status]
+verify_jwt = false
+
+[functions.create-mp-preference]
+verify_jwt = false
+
+[functions.create-pix-payment]
+verify_jwt = false
+
+[functions.mp-webhook]
+verify_jwt = false
+
+[functions.test-elevenlabs-key]
+verify_jwt = false
+
+[functions.text-to-speech]
+verify_jwt = false
+
+[functions.process-affiliate-withdrawal]
+verify_jwt = false
+
+[functions.check-affiliate-status]
+verify_jwt = false
