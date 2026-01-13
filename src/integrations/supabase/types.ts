@@ -691,6 +691,8 @@ export type Database = {
           matricula: number
           payment_proof_url: string | null
           phone: string | null
+          pix_key: string | null
+          pix_key_type: string | null
           salary_amount: number | null
           salary_day: number | null
           subscription_end_date: string | null
@@ -723,6 +725,8 @@ export type Database = {
           matricula: number
           payment_proof_url?: string | null
           phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
           salary_amount?: number | null
           salary_day?: number | null
           subscription_end_date?: string | null
@@ -755,6 +759,8 @@ export type Database = {
           matricula?: number
           payment_proof_url?: string | null
           phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
           salary_amount?: number | null
           salary_day?: number | null
           subscription_end_date?: string | null

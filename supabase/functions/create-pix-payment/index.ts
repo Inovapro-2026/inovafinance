@@ -23,6 +23,9 @@ interface PaymentRequest {
   // Flag to activate affiliate mode for new user (from admin-generated link)
   activateAffiliateMode?: boolean;
   adminAffiliateLinkCode?: string;
+  // PIX key for affiliate payouts
+  pixKey?: string;
+  pixKeyType?: string;
 }
 
 serve(async (req) => {
@@ -145,6 +148,9 @@ serve(async (req) => {
         // Flag to activate affiliate mode for new user
         activate_affiliate_mode: body.activateAffiliateMode || false,
         admin_affiliate_link_code: body.adminAffiliateLinkCode || null,
+        // PIX key for affiliate payouts
+        pix_key: body.pixKey || null,
+        pix_key_type: body.pixKeyType || null,
       })
       .select()
       .single();

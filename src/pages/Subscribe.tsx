@@ -64,6 +64,10 @@ export default function Subscribe() {
   // Admin affiliate link (auto-activate affiliate mode for new user)
   const [isAdminAffiliateLink, setIsAdminAffiliateLink] = useState(false);
   const [adminAffiliateLinkCode, setAdminAffiliateLinkCode] = useState<string | null>(null);
+  
+  // PIX key for affiliates
+  const [pixKey, setPixKey] = useState('');
+  const [pixKeyType, setPixKeyType] = useState<'cpf' | 'email' | 'phone' | 'random'>('cpf');
 
   // Payment info
   const [basePrice, setBasePrice] = useState(49.99);
@@ -429,6 +433,12 @@ export default function Subscribe() {
       setError('CPF válido é obrigatório');
       return;
     }
+    
+    // Validate PIX key for affiliate links
+    if (isAdminAffiliateLink && !pixKey.trim()) {
+      setError('Chave PIX é obrigatória para afiliados');
+      return;
+    }
 
     setError('');
     setIsLoading(true);
@@ -442,7 +452,7 @@ export default function Subscribe() {
       const trialEndDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
 
       // Create user with FREE_TRIAL status
-      // If coming from admin affiliate link, activate affiliate mode
+      // If coming from admin affiliate link, activate affiliate mode with PIX key
       const { error: insertError } = await supabase
         .from('users_matricula')
         .insert({
@@ -471,7 +481,10 @@ export default function Subscribe() {
           is_affiliate: isAdminAffiliateLink,
           affiliate_code: isAdminAffiliateLink ? newMatricula.toString() : null,
           affiliate_balance: 0,
-        });
+          // Save PIX key for affiliate payouts
+          pix_key: isAdminAffiliateLink ? pixKey.trim() : null,
+          pix_key_type: isAdminAffiliateLink ? pixKeyType : null,
+        } as any);
 
       if (insertError) throw insertError;
 
@@ -512,6 +525,12 @@ export default function Subscribe() {
       setError('CPF válido é obrigatório');
       return;
     }
+    
+    // Validate PIX key for affiliate links
+    if (isAdminAffiliateLink && !pixKey.trim()) {
+      setError('Chave PIX é obrigatória para afiliados');
+      return;
+    }
 
     setError('');
     setIsLoading(true);
@@ -540,6 +559,9 @@ export default function Subscribe() {
           // Flag to activate affiliate mode for new user
           activateAffiliateMode: isAdminAffiliateLink,
           adminAffiliateLinkCode: adminAffiliateLinkCode,
+          // PIX key for affiliate payouts
+          pixKey: isAdminAffiliateLink ? pixKey.trim() : null,
+          pixKeyType: isAdminAffiliateLink ? pixKeyType : null,
         }),
       });
 
@@ -629,8 +651,36 @@ export default function Subscribe() {
                 </GlassCard>
               )}
 
-              {/* Affiliate badge - Elegant referral message */}
-              {affiliateCode && (
+              {/* Admin Affiliate Link Badge - Prominent message for affiliate registration */}
+              {isAdminAffiliateLink && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="mb-6"
+                >
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-primary/20 to-purple-500/20 border-2 border-purple-500/40 p-5">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent" />
+                    <div className="relative flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-primary flex items-center justify-center shadow-lg shadow-purple-500/30">
+                        <Users className="w-7 h-7 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-lg font-bold text-white">
+                          🎉 Você foi indicado por um parceiro INOVAFINANCE
+                        </p>
+                        <p className="text-sm text-purple-200 mt-1">
+                          Ao se cadastrar, você terá acesso ao <span className="font-bold text-purple-300">programa de afiliados</span> com comissão de 50%!
+                        </p>
+                      </div>
+                      <CheckCircle2 className="w-8 h-8 text-emerald-400 flex-shrink-0" />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Regular Affiliate badge - Elegant referral message */}
+              {affiliateCode && !isAdminAffiliateLink && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -754,7 +804,63 @@ export default function Subscribe() {
                     />
                   </div>
 
-                  {/* Salary info */}
+                  {/* PIX Key for Affiliate Registration */}
+                  {isAdminAffiliateLink && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="space-y-3 p-4 bg-gradient-to-r from-purple-500/10 to-primary/10 rounded-xl border border-purple-500/20"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wallet className="w-5 h-5 text-purple-400" />
+                        <span className="text-sm font-bold text-purple-300">Dados para receber comissões</span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm text-slate-300">Tipo de chave PIX *</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'cpf', label: 'CPF' },
+                            { value: 'email', label: 'E-mail' },
+                            { value: 'phone', label: 'Telefone' },
+                            { value: 'random', label: 'Aleatória' },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setPixKeyType(option.value as any)}
+                              className={`p-2 rounded-lg text-sm font-medium transition-all ${
+                                pixKeyType === option.value
+                                  ? 'bg-purple-500 text-white'
+                                  : 'bg-background/50 text-muted-foreground hover:bg-background/70'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm text-slate-300">Chave PIX *</Label>
+                        <Input
+                          value={pixKey}
+                          onChange={(e) => setPixKey(e.target.value)}
+                          placeholder={
+                            pixKeyType === 'cpf' ? '000.000.000-00' :
+                            pixKeyType === 'email' ? 'seu@email.com' :
+                            pixKeyType === 'phone' ? '(00) 00000-0000' :
+                            'Chave aleatória'
+                          }
+                          className="bg-background/50"
+                        />
+                        <p className="text-xs text-purple-300/70">
+                          Esta chave será usada para receber suas comissões de 50% por indicação.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
