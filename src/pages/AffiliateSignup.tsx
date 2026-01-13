@@ -74,7 +74,7 @@ export default function AffiliateSignup() {
           .from("system_settings")
           .select("value")
           .eq("key", "affiliate_links")
-          .single();
+          .maybeSingle();
 
         if (fetchError) throw fetchError;
 
