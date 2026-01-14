@@ -67,6 +67,11 @@ export default function Subscribe() {
   const [currentDebitBalance, setCurrentDebitBalance] = useState('');
   const [currentCreditBalance, setCurrentCreditBalance] = useState('');
 
+  // Real-time validation states
+  const [cpfValidation, setCpfValidation] = useState<{ status: 'idle' | 'checking' | 'valid' | 'invalid' | 'duplicate'; message: string }>({ status: 'idle', message: '' });
+  const [phoneValidation, setPhoneValidation] = useState<{ status: 'idle' | 'checking' | 'valid' | 'duplicate'; message: string }>({ status: 'idle', message: '' });
+  const [emailValidation, setEmailValidation] = useState<{ status: 'idle' | 'checking' | 'valid' | 'invalid' | 'duplicate'; message: string }>({ status: 'idle', message: '' });
+
   // Coupon code
   const [couponCode, setCouponCode] = useState('');
   const [couponValidated, setCouponValidated] = useState(false);
@@ -543,46 +548,128 @@ export default function Subscribe() {
     return true;
   };
 
-  // Check for duplicate data in database
-  const checkDuplicateData = async (): Promise<{ isDuplicate: boolean; field: string }> => {
-    const cleanCpf = cpf.replace(/\D/g, '');
-    const cleanPhone = phone.replace(/\D/g, '');
+  // Real-time CPF validation
+  const validateCPFRealtime = useCallback(async (cpfValue: string) => {
+    const cleanCpf = cpfValue.replace(/\D/g, '');
     
-    // Check CPF
-    const { data: cpfData } = await supabase
+    if (cleanCpf.length < 11) {
+      setCpfValidation({ status: 'idle', message: '' });
+      return;
+    }
+    
+    if (!isValidCPF(cpfValue)) {
+      setCpfValidation({ status: 'invalid', message: 'CPF inválido' });
+      return;
+    }
+    
+    setCpfValidation({ status: 'checking', message: 'Verificando...' });
+    
+    const { data } = await supabase
       .from('users_matricula')
       .select('matricula')
       .eq('cpf', cleanCpf)
       .maybeSingle();
     
-    if (cpfData) {
-      return { isDuplicate: true, field: 'CPF' };
+    if (data) {
+      setCpfValidation({ status: 'duplicate', message: 'CPF já cadastrado' });
+    } else {
+      setCpfValidation({ status: 'valid', message: 'CPF válido' });
+    }
+  }, []);
+
+  // Real-time phone validation
+  const validatePhoneRealtime = useCallback(async (phoneValue: string) => {
+    const cleanPhone = phoneValue.replace(/\D/g, '');
+    
+    if (cleanPhone.length < 10) {
+      setPhoneValidation({ status: 'idle', message: '' });
+      return;
     }
     
-    // Check phone
-    const { data: phoneData } = await supabase
+    setPhoneValidation({ status: 'checking', message: 'Verificando...' });
+    
+    const { data } = await supabase
       .from('users_matricula')
       .select('matricula')
       .eq('phone', cleanPhone)
       .maybeSingle();
     
-    if (phoneData) {
+    if (data) {
+      setPhoneValidation({ status: 'duplicate', message: 'Telefone já cadastrado' });
+    } else {
+      setPhoneValidation({ status: 'valid', message: 'Telefone disponível' });
+    }
+  }, []);
+
+  // Real-time email validation
+  const validateEmailRealtime = useCallback(async (emailValue: string) => {
+    const trimmedEmail = emailValue.trim();
+    
+    if (!trimmedEmail) {
+      setEmailValidation({ status: 'idle', message: '' });
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setEmailValidation({ status: 'invalid', message: 'E-mail inválido' });
+      return;
+    }
+    
+    setEmailValidation({ status: 'checking', message: 'Verificando...' });
+    
+    const { data } = await supabase
+      .from('users_matricula')
+      .select('matricula')
+      .eq('email', trimmedEmail.toLowerCase())
+      .maybeSingle();
+    
+    if (data) {
+      setEmailValidation({ status: 'duplicate', message: 'E-mail já cadastrado' });
+    } else {
+      setEmailValidation({ status: 'valid', message: 'E-mail disponível' });
+    }
+  }, []);
+
+  // Debounced validation effects
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (cpf.replace(/\D/g, '').length === 11) {
+        validateCPFRealtime(cpf);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [cpf, validateCPFRealtime]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (phone.replace(/\D/g, '').length >= 10) {
+        validatePhoneRealtime(phone);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [phone, validatePhoneRealtime]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (email.trim()) {
+        validateEmailRealtime(email);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [email, validateEmailRealtime]);
+
+  // Check for duplicate data in database
+  const checkDuplicateData = async (): Promise<{ isDuplicate: boolean; field: string }> => {
+    if (cpfValidation.status === 'duplicate') {
+      return { isDuplicate: true, field: 'CPF' };
+    }
+    if (phoneValidation.status === 'duplicate') {
       return { isDuplicate: true, field: 'telefone' };
     }
-    
-    // Check email if provided
-    if (email.trim()) {
-      const { data: emailData } = await supabase
-        .from('users_matricula')
-        .select('matricula')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle();
-      
-      if (emailData) {
-        return { isDuplicate: true, field: 'e-mail' };
-      }
+    if (emailValidation.status === 'duplicate') {
+      return { isDuplicate: true, field: 'e-mail' };
     }
-    
     return { isDuplicate: false, field: '' };
   };
 
@@ -608,11 +695,19 @@ export default function Subscribe() {
             setError('E-mail inválido');
             return false;
           }
+          if (emailValidation.status === 'duplicate') {
+            setError('Este e-mail já está cadastrado');
+            return false;
+          }
         }
         break;
       case 'phone':
         if (!phone.trim() || phone.replace(/\D/g, '').length < 10) {
           setError('Telefone válido é obrigatório');
+          return false;
+        }
+        if (phoneValidation.status === 'duplicate') {
+          setError('Este telefone já está cadastrado');
           return false;
         }
         break;
@@ -623,6 +718,10 @@ export default function Subscribe() {
         }
         if (!isValidCPF(cpf)) {
           setError('CPF inválido. Verifique os dígitos.');
+          return false;
+        }
+        if (cpfValidation.status === 'duplicate') {
+          setError('Este CPF já está cadastrado');
           return false;
         }
         break;
@@ -903,14 +1002,42 @@ export default function Subscribe() {
                   Este campo é opcional
                 </p>
               </div>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                className="bg-background/50 text-center text-lg h-14"
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className={`bg-background/50 text-center text-lg h-14 pr-12 ${
+                    emailValidation.status === 'duplicate' || emailValidation.status === 'invalid' 
+                      ? 'border-red-500 focus-visible:ring-red-500' 
+                      : emailValidation.status === 'valid' 
+                        ? 'border-green-500 focus-visible:ring-green-500' 
+                        : ''
+                  }`}
+                  autoFocus
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {emailValidation.status === 'checking' && (
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  )}
+                  {emailValidation.status === 'valid' && (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  )}
+                  {(emailValidation.status === 'duplicate' || emailValidation.status === 'invalid') && (
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  )}
+                </div>
+              </div>
+              {emailValidation.message && (
+                <p className={`text-sm text-center ${
+                  emailValidation.status === 'valid' ? 'text-green-500' : 
+                  emailValidation.status === 'duplicate' || emailValidation.status === 'invalid' ? 'text-red-500' : 
+                  'text-muted-foreground'
+                }`}>
+                  {emailValidation.message}
+                </p>
+              )}
             </div>
           )}
 
@@ -925,14 +1052,42 @@ export default function Subscribe() {
                   Digite com DDD
                 </p>
               </div>
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                placeholder="(11) 99999-9999"
-                maxLength={15}
-                className="bg-background/50 text-center text-lg h-14"
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(formatPhone(e.target.value))}
+                  placeholder="(11) 99999-9999"
+                  maxLength={15}
+                  className={`bg-background/50 text-center text-lg h-14 pr-12 ${
+                    phoneValidation.status === 'duplicate' 
+                      ? 'border-red-500 focus-visible:ring-red-500' 
+                      : phoneValidation.status === 'valid' 
+                        ? 'border-green-500 focus-visible:ring-green-500' 
+                        : ''
+                  }`}
+                  autoFocus
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {phoneValidation.status === 'checking' && (
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  )}
+                  {phoneValidation.status === 'valid' && (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  )}
+                  {phoneValidation.status === 'duplicate' && (
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  )}
+                </div>
+              </div>
+              {phoneValidation.message && (
+                <p className={`text-sm text-center ${
+                  phoneValidation.status === 'valid' ? 'text-green-500' : 
+                  phoneValidation.status === 'duplicate' ? 'text-red-500' : 
+                  'text-muted-foreground'
+                }`}>
+                  {phoneValidation.message}
+                </p>
+              )}
             </div>
           )}
 
@@ -947,14 +1102,42 @@ export default function Subscribe() {
                   Necessário para verificação
                 </p>
               </div>
-              <Input
-                value={cpf}
-                onChange={(e) => setCpf(formatCPF(e.target.value))}
-                placeholder="000.000.000-00"
-                maxLength={14}
-                className="bg-background/50 text-center text-lg h-14"
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  value={cpf}
+                  onChange={(e) => setCpf(formatCPF(e.target.value))}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  className={`bg-background/50 text-center text-lg h-14 pr-12 ${
+                    cpfValidation.status === 'duplicate' || cpfValidation.status === 'invalid'
+                      ? 'border-red-500 focus-visible:ring-red-500' 
+                      : cpfValidation.status === 'valid' 
+                        ? 'border-green-500 focus-visible:ring-green-500' 
+                        : ''
+                  }`}
+                  autoFocus
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {cpfValidation.status === 'checking' && (
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  )}
+                  {cpfValidation.status === 'valid' && (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  )}
+                  {(cpfValidation.status === 'duplicate' || cpfValidation.status === 'invalid') && (
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  )}
+                </div>
+              </div>
+              {cpfValidation.message && (
+                <p className={`text-sm text-center ${
+                  cpfValidation.status === 'valid' ? 'text-green-500' : 
+                  cpfValidation.status === 'duplicate' || cpfValidation.status === 'invalid' ? 'text-red-500' : 
+                  'text-muted-foreground'
+                }`}>
+                  {cpfValidation.message}
+                </p>
+              )}
             </div>
           )}
 
