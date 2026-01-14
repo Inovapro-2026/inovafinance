@@ -50,24 +50,35 @@ serve(async (req) => {
 
     const body: PaymentRequest = await req.json();
     
-    // Check if this is a renewal request - fetch user data from DB
-    let fullName = body.fullName;
-    let phone = body.phone;
-    let cpf = body.cpf;
-    let email = body.email;
+    // Initialize user data variables
+    let fullName = body.fullName || '';
+    let phone = body.phone || '';
+    let cpf = body.cpf || '';
+    let email = body.email || '';
+    let isRenewal = false;
     
+    // Check if this is a renewal request - fetch user data from DB
     if (body.renewalMatricula) {
-      const { data: existingUser } = await supabase
+      isRenewal = true;
+      const { data: existingUser, error: userError } = await supabase
         .from('users_matricula')
         .select('full_name, phone, cpf, email')
         .eq('matricula', body.renewalMatricula)
         .single();
       
+      if (userError) {
+        console.error('Error fetching user for renewal:', userError);
+        return new Response(
+          JSON.stringify({ error: 'Usuário não encontrado para renovação' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       if (existingUser) {
-        fullName = existingUser.full_name || fullName;
-        phone = existingUser.phone || phone;
-        cpf = existingUser.cpf || cpf;
-        email = existingUser.email || email;
+        fullName = existingUser.full_name || '';
+        phone = existingUser.phone || '';
+        cpf = existingUser.cpf || '';
+        email = existingUser.email || '';
       }
     }
     
