@@ -178,22 +178,45 @@ export default function AI() {
   const [installments, setInstallments] = useState(1);
   const [showInstallments, setShowInstallments] = useState(false);
   const [displayBalance, setDisplayBalance] = useState<{ debit: number; credit: number } | null>(null);
-  const [balanceUpdated, setBalanceUpdated] = useState(false);
+  const [balanceVisible, setBalanceVisible] = useState(false);
+  const [balanceAnimationType, setBalanceAnimationType] = useState<'query' | 'increase' | 'decrease' | null>(null);
   const recognitionRef = useRef<any>(null);
+  const balanceHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load balance on mount and after transactions
-  useEffect(() => {
-    const loadBalance = async () => {
-      if (!user) return;
-      const { debitBalance } = await calculateBalance(user.userId, user.initialBalance);
-      const creditAvailable = (user.creditLimit || 0) - (user.creditUsed || 0);
-      setDisplayBalance({
-        debit: Math.max(0, debitBalance),
-        credit: Math.max(0, creditAvailable)
-      });
-    };
-    loadBalance();
+  // Function to show balance with animation and auto-hide after 5 seconds
+  const showBalanceWithAnimation = useCallback(async (type: 'query' | 'increase' | 'decrease') => {
+    if (!user) return;
+    
+    const { debitBalance } = await calculateBalance(user.userId, user.initialBalance);
+    const creditAvailable = (user.creditLimit || 0) - (user.creditUsed || 0);
+    setDisplayBalance({
+      debit: Math.max(0, debitBalance),
+      credit: Math.max(0, creditAvailable)
+    });
+    
+    setBalanceAnimationType(type);
+    setBalanceVisible(true);
+    
+    // Clear any existing timeout
+    if (balanceHideTimeoutRef.current) {
+      clearTimeout(balanceHideTimeoutRef.current);
+    }
+    
+    // Auto-hide after 5 seconds
+    balanceHideTimeoutRef.current = setTimeout(() => {
+      setBalanceVisible(false);
+      setBalanceAnimationType(null);
+    }, 5000);
   }, [user]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (balanceHideTimeoutRef.current) {
+        clearTimeout(balanceHideTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Initialize ElevenLabs TTS
   useEffect(() => {
@@ -517,20 +540,27 @@ export default function AI() {
     } else {
       setStatusText('Pronta para ajudar');
       
+      // Check if this is a balance-related query to show balance animation
+      const balanceKeywords = ['saldo', 'dinheiro', 'quanto tenho', 'quanto eu tenho', 'meu dinheiro', 'disponível', 'quanto tem', 'meu saldo'];
+      const isBalanceQuery = balanceKeywords.some(keyword => 
+        message.toLowerCase().includes(keyword) || 
+        data.message?.toLowerCase().includes('saldo') ||
+        data.message?.toLowerCase().includes('disponível') ||
+        data.message?.toLowerCase().includes('r$')
+      );
+      
+      // Show balance with query animation if it's a balance query
+      if (isBalanceQuery) {
+        await showBalanceWithAnimation('query');
+      }
+      
       // Enhance response with enthusiasm if balance is good
       const context = await getFinancialContext();
       let responseMessage = data.message;
       
       // Add animated prefix for balance-related queries when balance > 500
-      if (context.debitBalance > 500) {
-        const balanceKeywords = ['saldo', 'dinheiro', 'quanto tenho', 'quanto eu tenho', 'meu dinheiro', 'disponível'];
-        const isBalanceQuery = balanceKeywords.some(keyword => 
-          data.message?.toLowerCase().includes(keyword) || 
-          responseMessage?.toLowerCase().includes('saldo') ||
-          responseMessage?.toLowerCase().includes('disponível')
-        );
-        
-        if (isBalanceQuery && !responseMessage?.includes('Parabéns') && !responseMessage?.includes('Excelente')) {
+      if (context.debitBalance > 500 && isBalanceQuery) {
+        if (!responseMessage?.includes('Parabéns') && !responseMessage?.includes('Excelente')) {
           // Add enthusiastic prefix for good balance
           const enthusiasticPrefixes = [
             'Ótimas notícias! ',
@@ -599,16 +629,9 @@ export default function AI() {
 
       await refreshUser();
 
-      // Update displayed balance with animation trigger
-      const { debitBalance } = await calculateBalance(user.userId, user.initialBalance);
-      const creditAvailable = (user.creditLimit || 0) - (user.creditUsed || 0);
-      setDisplayBalance({
-        debit: Math.max(0, debitBalance),
-        credit: Math.max(0, creditAvailable)
-      });
-      // Trigger balance update animation
-      setBalanceUpdated(true);
-      setTimeout(() => setBalanceUpdated(false), 1500);
+      // Show balance with animation based on transaction type
+      const animType = pendingTransaction.type === 'expense' ? 'decrease' : 'increase';
+      await showBalanceWithAnimation(animType);
 
       const methodText = pendingTransaction.type === 'expense'
         ? pendingTransaction.paymentMethod === 'credit' ? ' no crédito' : ' no débito'
@@ -819,85 +842,137 @@ export default function AI() {
             <p className="text-muted-foreground text-sm">Sua Assistente Financeira Inteligente</p>
           </motion.div>
 
-          {/* Balance Display Card */}
-          {displayBalance && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ 
-                opacity: 1, 
-                scale: balanceUpdated ? [1, 1.05, 1] : 1,
-              }}
-              transition={{ 
-                duration: balanceUpdated ? 0.5 : 0.3,
-                ease: "easeOut"
-              }}
-              className="mb-8 flex gap-4"
-            >
-              {/* Debit Balance */}
-              <motion.div 
-                className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3 text-center min-w-[120px] relative overflow-hidden"
-                animate={balanceUpdated ? {
-                  boxShadow: ['0 0 0 rgba(16,185,129,0)', '0 0 20px rgba(16,185,129,0.5)', '0 0 0 rgba(16,185,129,0)']
-                } : {}}
-                transition={{ duration: 1 }}
+          {/* Balance Display Card - Only visible when queried or after transaction */}
+          <AnimatePresence>
+            {balanceVisible && displayBalance && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                animate={{ 
+                  opacity: 1, 
+                  scale: 1,
+                  y: 0,
+                }}
+                exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                transition={{ 
+                  duration: 0.4,
+                  ease: "easeOut"
+                }}
+                className="mb-8 flex gap-4"
               >
-                {balanceUpdated && (
+                {/* Debit Balance */}
+                <motion.div 
+                  className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3 text-center min-w-[120px] relative overflow-hidden"
+                  animate={balanceAnimationType === 'decrease' ? {
+                    boxShadow: ['0 0 0 rgba(239,68,68,0)', '0 0 25px rgba(239,68,68,0.6)', '0 0 0 rgba(239,68,68,0)']
+                  } : balanceAnimationType === 'increase' ? {
+                    boxShadow: ['0 0 0 rgba(16,185,129,0)', '0 0 25px rgba(16,185,129,0.6)', '0 0 0 rgba(16,185,129,0)']
+                  } : {
+                    boxShadow: ['0 0 0 rgba(168,85,247,0)', '0 0 20px rgba(168,85,247,0.4)', '0 0 0 rgba(168,85,247,0)']
+                  }}
+                  transition={{ duration: 1.2, repeat: balanceAnimationType === 'query' ? 1 : 0 }}
+                >
+                  {/* Flash overlay based on animation type */}
                   <motion.div
-                    className="absolute inset-0 bg-emerald-400/20"
+                    className={`absolute inset-0 ${
+                      balanceAnimationType === 'decrease' ? 'bg-red-400/30' : 
+                      balanceAnimationType === 'increase' ? 'bg-emerald-400/30' : 
+                      'bg-purple-400/20'
+                    }`}
                     initial={{ opacity: 1 }}
                     animate={{ opacity: 0 }}
                     transition={{ duration: 1 }}
                   />
-                )}
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <Wallet className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs text-muted-foreground">Débito</span>
-                </div>
-                <motion.p 
-                  className="text-lg font-semibold text-emerald-400"
-                  key={displayBalance.debit}
-                  initial={balanceUpdated ? { scale: 1.2, color: '#34d399' } : false}
-                  animate={{ scale: 1, color: '#34d399' }}
-                  transition={{ duration: 0.3 }}
-                >
-                  R$ {displayBalance.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </motion.p>
-              </motion.div>
-
-              {/* Credit Available */}
-              {user?.hasCreditCard && (
-                <motion.div 
-                  className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3 text-center min-w-[120px] relative overflow-hidden"
-                  animate={balanceUpdated ? {
-                    boxShadow: ['0 0 0 rgba(59,130,246,0)', '0 0 20px rgba(59,130,246,0.5)', '0 0 0 rgba(59,130,246,0)']
-                  } : {}}
-                  transition={{ duration: 1 }}
-                >
-                  {balanceUpdated && (
+                  
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
                     <motion.div
-                      className="absolute inset-0 bg-blue-400/20"
+                      animate={balanceAnimationType === 'decrease' ? { y: [0, 3, 0] } : 
+                               balanceAnimationType === 'increase' ? { y: [0, -3, 0] } : {}}
+                      transition={{ duration: 0.5, repeat: 2 }}
+                    >
+                      {balanceAnimationType === 'decrease' ? (
+                        <ArrowDown className="w-4 h-4 text-red-400" />
+                      ) : balanceAnimationType === 'increase' ? (
+                        <ArrowUp className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <Wallet className="w-4 h-4 text-emerald-400" />
+                      )}
+                    </motion.div>
+                    <span className="text-xs text-muted-foreground">Débito</span>
+                  </div>
+                  <motion.p 
+                    className={`text-lg font-semibold ${
+                      balanceAnimationType === 'decrease' ? 'text-red-400' : 'text-emerald-400'
+                    }`}
+                    key={`debit-${displayBalance.debit}`}
+                    initial={{ 
+                      scale: 1.3, 
+                      y: balanceAnimationType === 'decrease' ? -10 : balanceAnimationType === 'increase' ? 10 : 0 
+                    }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ duration: 0.5, type: 'spring' }}
+                  >
+                    R$ {displayBalance.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </motion.p>
+                </motion.div>
+
+                {/* Credit Available */}
+                {user?.hasCreditCard && (
+                  <motion.div 
+                    className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3 text-center min-w-[120px] relative overflow-hidden"
+                    animate={balanceAnimationType === 'decrease' ? {
+                      boxShadow: ['0 0 0 rgba(239,68,68,0)', '0 0 25px rgba(239,68,68,0.6)', '0 0 0 rgba(239,68,68,0)']
+                    } : balanceAnimationType === 'increase' ? {
+                      boxShadow: ['0 0 0 rgba(59,130,246,0)', '0 0 25px rgba(59,130,246,0.6)', '0 0 0 rgba(59,130,246,0)']
+                    } : {
+                      boxShadow: ['0 0 0 rgba(168,85,247,0)', '0 0 20px rgba(168,85,247,0.4)', '0 0 0 rgba(168,85,247,0)']
+                    }}
+                    transition={{ duration: 1.2, repeat: balanceAnimationType === 'query' ? 1 : 0 }}
+                  >
+                    {/* Flash overlay */}
+                    <motion.div
+                      className={`absolute inset-0 ${
+                        balanceAnimationType === 'decrease' ? 'bg-red-400/30' : 
+                        balanceAnimationType === 'increase' ? 'bg-blue-400/30' : 
+                        'bg-purple-400/20'
+                      }`}
                       initial={{ opacity: 1 }}
                       animate={{ opacity: 0 }}
                       transition={{ duration: 1 }}
                     />
-                  )}
-                  <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <CreditCard className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs text-muted-foreground">Crédito</span>
-                  </div>
-                  <motion.p 
-                    className="text-lg font-semibold text-blue-400"
-                    key={displayBalance.credit}
-                    initial={balanceUpdated ? { scale: 1.2, color: '#60a5fa' } : false}
-                    animate={{ scale: 1, color: '#60a5fa' }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    R$ {displayBalance.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </motion.p>
-                </motion.div>
-              )}
-            </motion.div>
-          )}
+                    
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <motion.div
+                        animate={balanceAnimationType === 'decrease' ? { y: [0, 3, 0] } : 
+                                 balanceAnimationType === 'increase' ? { y: [0, -3, 0] } : {}}
+                        transition={{ duration: 0.5, repeat: 2 }}
+                      >
+                        {balanceAnimationType === 'decrease' ? (
+                          <ArrowDown className="w-4 h-4 text-red-400" />
+                        ) : (
+                          <CreditCard className="w-4 h-4 text-blue-400" />
+                        )}
+                      </motion.div>
+                      <span className="text-xs text-muted-foreground">Crédito</span>
+                    </div>
+                    <motion.p 
+                      className={`text-lg font-semibold ${
+                        balanceAnimationType === 'decrease' ? 'text-red-400' : 'text-blue-400'
+                      }`}
+                      key={`credit-${displayBalance.credit}`}
+                      initial={{ 
+                        scale: 1.3, 
+                        y: balanceAnimationType === 'decrease' ? -10 : balanceAnimationType === 'increase' ? 10 : 0 
+                      }}
+                      animate={{ scale: 1, y: 0 }}
+                      transition={{ duration: 0.5, type: 'spring' }}
+                    >
+                      R$ {displayBalance.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </motion.p>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Central Microphone Button */}
           <motion.div
