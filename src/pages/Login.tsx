@@ -124,6 +124,13 @@ export default function Login() {
     checkBiometric();
   }, []);
 
+  // Auto-submit when matricula reaches 6 digits
+  useEffect(() => {
+    if (matricula.length === 6 && !isLoading && step === 'matricula') {
+      handleMatriculaSubmit();
+    }
+  }, [matricula]);
+
   // Handle biometric login
   const handleBiometricLogin = async () => {
     setIsLoading(true);

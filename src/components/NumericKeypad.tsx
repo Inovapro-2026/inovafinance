@@ -35,13 +35,15 @@ export function NumericKeypad({
     } else if (value.length < maxLength) {
       const newValue = value + key;
       onChange(newValue);
-      
-      // Auto submit when reaching maxLength
-      if (autoSubmit && newValue.length === maxLength) {
-        setTimeout(() => {
-          onSubmit();
-        }, 200);
-      }
+    }
+  };
+
+  // Watch for value changes and auto-submit when full
+  const handleAutoSubmit = (newValue: string) => {
+    if (autoSubmit && newValue.length === maxLength) {
+      setTimeout(() => {
+        onSubmit();
+      }, 300);
     }
   };
 
