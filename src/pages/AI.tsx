@@ -177,7 +177,22 @@ export default function AI() {
   } | null>(null);
   const [installments, setInstallments] = useState(1);
   const [showInstallments, setShowInstallments] = useState(false);
+  const [displayBalance, setDisplayBalance] = useState<{ debit: number; credit: number } | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Load balance on mount and after transactions
+  useEffect(() => {
+    const loadBalance = async () => {
+      if (!user) return;
+      const { debitBalance } = await calculateBalance(user.userId, user.initialBalance);
+      const creditAvailable = (user.creditLimit || 0) - (user.creditUsed || 0);
+      setDisplayBalance({
+        debit: Math.max(0, debitBalance),
+        credit: Math.max(0, creditAvailable)
+      });
+    };
+    loadBalance();
+  }, [user]);
 
   // Initialize ElevenLabs TTS
   useEffect(() => {
@@ -583,6 +598,14 @@ export default function AI() {
 
       await refreshUser();
 
+      // Update displayed balance
+      const { debitBalance } = await calculateBalance(user.userId, user.initialBalance);
+      const creditAvailable = (user.creditLimit || 0) - (user.creditUsed || 0);
+      setDisplayBalance({
+        debit: Math.max(0, debitBalance),
+        credit: Math.max(0, creditAvailable)
+      });
+
       const methodText = pendingTransaction.type === 'expense'
         ? pendingTransaction.paymentMethod === 'credit' ? ' no crédito' : ' no débito'
         : '';
@@ -778,7 +801,7 @@ export default function AI() {
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="text-center mb-12"
+            className="text-center mb-8"
           >
             <motion.h1
               className="font-display text-3xl font-bold gradient-text mb-2"
@@ -791,6 +814,39 @@ export default function AI() {
             </motion.h1>
             <p className="text-muted-foreground text-sm">Sua Assistente Financeira Inteligente</p>
           </motion.div>
+
+          {/* Balance Display Card */}
+          {displayBalance && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-8 flex gap-4"
+            >
+              {/* Debit Balance */}
+              <div className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3 text-center min-w-[120px]">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <Wallet className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs text-muted-foreground">Débito</span>
+                </div>
+                <p className="text-lg font-semibold text-emerald-400">
+                  R$ {displayBalance.debit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              {/* Credit Available */}
+              {user?.hasCreditCard && (
+                <div className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3 text-center min-w-[120px]">
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <CreditCard className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-muted-foreground">Crédito</span>
+                  </div>
+                  <p className="text-lg font-semibold text-blue-400">
+                    R$ {displayBalance.credit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
 
           {/* Central Microphone Button */}
           <motion.div
