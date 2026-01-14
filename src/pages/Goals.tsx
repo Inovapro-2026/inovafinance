@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Target, Trophy, Calendar, X, User, Mail, Phone, CreditCard, Wallet, Lock, Edit3, Check, Hash, DollarSign, CalendarDays, LogOut } from 'lucide-react';
+import { Plus, Target, Trophy, Calendar, X, User, Mail, Phone, CreditCard, Wallet, Lock, Edit3, Check, Hash, DollarSign, CalendarDays, LogOut, MessageCircle, Receipt, Banknote, Crown } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,14 @@ import { getGoals, addGoal, updateGoal, updateProfile, type Goal } from '@/lib/d
 import { updateUserSalaryInfo, getUserSalaryInfo } from '@/lib/plannerDb';
 import { toast } from 'sonner';
 import { useIsaGreeting } from '@/hooks/useIsaGreeting';
+import { SupportModal } from '@/components/SupportModal';
 
 export default function Goals() {
   const { user, refreshUser, logout } = useAuth();
   const navigate = useNavigate();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'goals'>('profile');
   const [editingName, setEditingName] = useState(false);
   const [editingBalance, setEditingBalance] = useState(false);
@@ -467,6 +469,95 @@ export default function Goals() {
             </div>
           </GlassCard>
 
+          {/* Atalhos Rápidos */}
+          <div className="mt-6">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Atalhos Rápidos</p>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Cartão de Crédito */}
+              <GlassCard 
+                className="p-4 cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                onClick={() => navigate('/card')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Cartão</p>
+                    <p className="text-[10px] text-muted-foreground">Limite e fatura</p>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Extrato */}
+              <GlassCard 
+                className="p-4 cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                onClick={() => navigate('/statement')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                    <Receipt className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Extrato</p>
+                    <p className="text-[10px] text-muted-foreground">Movimentações</p>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Planejador */}
+              <GlassCard 
+                className="p-4 cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                onClick={() => navigate('/planner')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                    <Banknote className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Planejador</p>
+                    <p className="text-[10px] text-muted-foreground">Contas fixas</p>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Assinatura */}
+              <GlassCard 
+                className="p-4 cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                onClick={() => navigate('/subscription')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                    <Crown className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Assinatura</p>
+                    <p className="text-[10px] text-muted-foreground">Seu plano</p>
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+
+          {/* Suporte Button */}
+          <GlassCard 
+            className="p-4 mt-4 cursor-pointer hover:shadow-lg transition-all border-primary/30"
+            onClick={() => setShowSupportModal(true)}
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                <MessageCircle className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Suporte</p>
+                <p className="text-xs text-muted-foreground">Central de atendimento</p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Plus className="w-4 h-4 text-primary" />
+              </div>
+            </div>
+          </GlassCard>
+
           {/* Logout Button */}
           <Button
             onClick={() => {
@@ -739,6 +830,12 @@ export default function Goals() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Support Modal */}
+      <SupportModal 
+        isOpen={showSupportModal} 
+        onClose={() => setShowSupportModal(false)} 
+      />
     </motion.div>
   );
 }

@@ -5,9 +5,7 @@ import {
   CreditCard, 
   Mic,
   User,
-  CalendarCheck,
-  Users,
-  MessageCircle
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +17,7 @@ export function BottomNav() {
   // Filtrar itens baseado no usuário
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
-    { path: '/support', icon: MessageCircle, label: 'Suporte' },
+    { path: '/card', icon: CreditCard, label: 'Cartão' },
     { path: '/ai', icon: Mic, label: 'AI Voice', isCenter: true },
     ...(user?.isAffiliate ? [{ path: '/affiliates', icon: Users, label: 'Afiliados' }] : []),
     { path: '/goals', icon: User, label: 'Perfil' },
