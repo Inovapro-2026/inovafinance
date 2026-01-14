@@ -539,6 +539,7 @@ export default function Login() {
                       onChange={setMatricula}
                       onSubmit={handleMatriculaSubmit}
                       maxLength={6}
+                      autoSubmit={true}
                     />
 
                     {error && (
