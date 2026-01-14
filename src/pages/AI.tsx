@@ -502,41 +502,59 @@ export default function AI() {
         setStatusText('Confirme a transação');
 
         // Build intelligent speech based on balance situation
+        const savingTips = [
+          'Dica: tente separar 10% do seu salário todo mês!',
+          'Dica: evite compras por impulso, espere 24 horas antes de decidir!',
+          'Dica: leve marmita pro trabalho, economiza muito!',
+          'Dica: cancele assinaturas que você não usa!',
+          'Dica: compare preços antes de comprar!',
+          'Dica: defina um limite diário de gastos!',
+          'Dica: anote todos os seus gastos, mesmo os pequenos!',
+          'Dica: evite parcelar compras pequenas!',
+        ];
+        const randomTip = savingTips[Math.floor(Math.random() * savingTips.length)];
+        
         if (args.type === 'expense') {
           const totalAvailable = realDebitBalance + realCreditAvailable;
           const minInstallments = realCreditAvailable > 0 ? Math.ceil(args.amount / realCreditAvailable) : 0;
           const canInstallment = minInstallments > 1 && minInstallments <= 12;
 
-          if (args.amount > totalAvailable && !canInstallment) {
-            // No balance anywhere and can't installment
-            speak(`Atenção! Gasto de ${args.amount} reais em ${args.category}. Você não tem saldo suficiente. Débito zerado e limite de crédito insuficiente.`);
-          } else if (realDebitBalance <= 0 && realCreditAvailable <= 0) {
-            // No balance at all
-            speak(`Atenção! Você não tem saldo no débito nem limite no crédito disponível para registrar esse gasto.`);
-          } else if (realDebitBalance <= 0 && args.amount > realCreditAvailable && canInstallment) {
-            // No debit, exceeds credit but can installment
-            speak(`Gasto de ${args.amount} reais em ${args.category}. Débito zerado. O valor excede seu limite de crédito de ${realCreditAvailable.toFixed(0)} reais, mas você pode parcelar em até ${minInstallments} vezes.`);
-          } else if (realDebitBalance <= 0 && args.amount <= realCreditAvailable) {
-            // No debit but fits in credit
-            speak(`Gasto de ${args.amount} reais em ${args.category}. Débito zerado, usando crédito. Limite disponível: ${realCreditAvailable.toFixed(0)} reais.`);
-          } else if (args.amount > realDebitBalance && user.hasCreditCard && args.amount <= realCreditAvailable) {
-            // Exceeds debit but fits credit
-            speak(`Gasto de ${args.amount} reais em ${args.category}. Seu débito tem apenas ${realDebitBalance.toFixed(0)} reais. Você pode usar o crédito.`);
-          } else if (args.amount > realDebitBalance && user.hasCreditCard && canInstallment) {
-            // Exceeds both but can installment
-            speak(`Gasto de ${args.amount} reais. Débito insuficiente e excede o crédito. Você pode parcelar em ${minInstallments} vezes ou mais.`);
-        } else {
-          // Excited response for good balance
-          if (realDebitBalance > 500) {
-            speak(`Que ótimo! Gasto de ${args.amount} reais em ${args.category}. Seu saldo está excelente, com ${realDebitBalance.toFixed(0)} reais disponíveis! Confirma?`);
-          } else {
-            speak(`Registrar gasto de ${args.amount} reais em ${args.category}? Escolha débito ou crédito.`);
+          // Check if expense exceeds total available - reject it
+          if (args.amount > totalAvailable) {
+            speak(`Eita! Você não pode gastar ${args.amount} reais porque você só tem ${totalAvailable.toFixed(0)} reais disponíveis no total. Não vou deixar você se endividar! 😤`);
+            setPendingTransaction(null);
+            setStatusText('Pronta para ajudar');
+            return;
           }
+          
+          // Expense fits but ISA is annoyed and gives tip
+          if (realDebitBalance <= 0 && realCreditAvailable <= 0) {
+            // No balance at all
+            speak(`Atenção! Você não tem saldo no débito nem limite no crédito. Nada de gastar hoje! 😤`);
+            setPendingTransaction(null);
+            setStatusText('Pronta para ajudar');
+            return;
+          } else if (realDebitBalance <= 0 && args.amount <= realCreditAvailable) {
+            // No debit but fits in credit - annoyed
+            speak(`Hum... mais ${args.amount} reais no crédito? 😒 Seu débito tá zerado! Tá bom, confirma aí... ${randomTip}`);
+          } else if (args.amount > realDebitBalance && user.hasCreditCard && args.amount <= realCreditAvailable) {
+            // Exceeds debit but fits credit - warning
+            speak(`Olha só, ${args.amount} reais não cabe no débito que tem ${realDebitBalance.toFixed(0)}. Vai no crédito então... 😤 ${randomTip}`);
+          } else if (args.amount > realDebitBalance && args.amount > realCreditAvailable && canInstallment) {
+            // Exceeds both but can installment
+            speak(`Ui! ${args.amount} reais é muito! Débito tem ${realDebitBalance.toFixed(0)} e crédito ${realCreditAvailable.toFixed(0)}. Mas dá pra parcelar em ${minInstallments}x. ${randomTip}`);
+          } else {
+            // Normal expense - still annoyed but less
+            if (args.amount > 100) {
+              speak(`Gastando ${args.amount} reais em ${args.category}? 😒 Tá certo... confirma aí. ${randomTip}`);
+            } else {
+              speak(`${args.amount} reais em ${args.category}. Pequeno gasto, mas fica de olho! ${randomTip}`);
+            }
+          }
+        } else {
+          // Income - always positive
+          speak(`Maravilha! Registrar ganho de ${args.amount} reais em ${args.category}? Isso vai melhorar seu saldo! 🎉`);
         }
-      } else {
-        // Income - always positive
-        speak(`Maravilha! Registrar ganho de ${args.amount} reais em ${args.category}? Isso vai melhorar seu saldo!`);
-      }
     } else {
       setStatusText('Pronta para ajudar');
       
@@ -1280,64 +1298,85 @@ export default function AI() {
                   <div className="mb-6">
                     <label className="text-xs text-muted-foreground mb-3 block">Pagar com</label>
                     <div className="flex gap-2">
-                      {/* Only show debit if there's balance available */}
-                      {currentDebitBalance > 0 && (
-                        <motion.button
-                          onClick={() => updatePaymentMethod('debit')}
-                          className={cn(
-                            "flex-1 py-4 rounded-xl font-medium transition-all flex flex-col items-center gap-2 border",
-                            pendingTransaction.paymentMethod === 'debit'
-                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
-                              : 'bg-muted/30 border-transparent text-muted-foreground hover:border-border'
-                          )}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Wallet className="w-6 h-6" />
-                          <span className="text-sm">Débito</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            Saldo: R$ {currentDebitBalance.toFixed(2)}
-                          </span>
-                        </motion.button>
-                      )}
+                      {/* Get the current amount being edited */}
+                      {(() => {
+                        const currentAmount = editingAmount ? parseFloat(editedAmount) || 0 : pendingTransaction.amount;
+                        const canUseDebit = currentDebitBalance >= currentAmount && currentDebitBalance > 0;
+                        const canUseCredit = user?.hasCreditCard && currentCreditAvailable >= currentAmount && currentCreditAvailable > 0;
+                        const neitherAvailable = !canUseDebit && !canUseCredit;
+                        
+                        return (
+                          <>
+                            {/* Only show debit if balance covers the expense */}
+                            {canUseDebit && (
+                              <motion.button
+                                onClick={() => updatePaymentMethod('debit')}
+                                className={cn(
+                                  "flex-1 py-4 rounded-xl font-medium transition-all flex flex-col items-center gap-2 border",
+                                  pendingTransaction.paymentMethod === 'debit'
+                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
+                                    : 'bg-muted/30 border-transparent text-muted-foreground hover:border-border'
+                                )}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <Wallet className="w-6 h-6" />
+                                <span className="text-sm">Débito</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  Saldo: R$ {currentDebitBalance.toFixed(2)}
+                                </span>
+                              </motion.button>
+                            )}
 
-                      {/* Show credit option if user has credit card */}
-                      {user?.hasCreditCard && (
-                        <motion.button
-                          onClick={() => updatePaymentMethod('credit')}
-                          className={cn(
-                            "flex-1 py-4 rounded-xl font-medium transition-all flex flex-col items-center gap-2 border",
-                            pendingTransaction.paymentMethod === 'credit'
-                              ? 'bg-secondary/20 text-secondary border-secondary/50'
-                              : 'bg-muted/30 border-transparent text-muted-foreground hover:border-border'
-                          )}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <CreditCard className="w-6 h-6" />
-                          <span className="text-sm">Crédito</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            Limite: R$ {currentCreditAvailable.toFixed(2)}
-                          </span>
-                        </motion.button>
-                      )}
+                            {/* Show credit option if credit covers the expense */}
+                            {canUseCredit && (
+                              <motion.button
+                                onClick={() => updatePaymentMethod('credit')}
+                                className={cn(
+                                  "flex-1 py-4 rounded-xl font-medium transition-all flex flex-col items-center gap-2 border",
+                                  pendingTransaction.paymentMethod === 'credit'
+                                    ? 'bg-secondary/20 text-secondary border-secondary/50'
+                                    : 'bg-muted/30 border-transparent text-muted-foreground hover:border-border'
+                                )}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <CreditCard className="w-6 h-6" />
+                                <span className="text-sm">Crédito</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  Limite: R$ {currentCreditAvailable.toFixed(2)}
+                                </span>
+                              </motion.button>
+                            )}
 
-                      {/* Show message if no payment method available */}
-                      {currentDebitBalance <= 0 && !user?.hasCreditCard && (
-                        <div className="flex-1 py-4 rounded-xl bg-destructive/10 border border-destructive/30 flex flex-col items-center gap-2">
-                          <Wallet className="w-6 h-6 text-destructive" />
-                          <span className="text-sm text-destructive">Sem saldo</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            Saldo zerado
-                          </span>
-                        </div>
-                      )}
+                            {/* Show message if neither payment method covers the expense */}
+                            {neitherAvailable && (
+                              <div className="flex-1 py-4 rounded-xl bg-destructive/10 border border-destructive/30 flex flex-col items-center gap-2">
+                                <Wallet className="w-6 h-6 text-destructive" />
+                                <span className="text-sm text-destructive">Saldo insuficiente</span>
+                                <span className="text-[10px] text-muted-foreground text-center px-2">
+                                  Débito: R$ {currentDebitBalance.toFixed(2)} | Crédito: R$ {currentCreditAvailable.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
-                    {/* Warning when debit is zero */}
-                    {currentDebitBalance <= 0 && user?.hasCreditCard && (
-                      <p className="text-xs text-warning mt-2 text-center">
-                        ⚠️ Saldo débito zerado. Usando crédito.
-                      </p>
-                    )}
+                    {/* Warning when debit can't cover but credit can */}
+                    {(() => {
+                      const currentAmount = editingAmount ? parseFloat(editedAmount) || 0 : pendingTransaction.amount;
+                      const canUseDebit = currentDebitBalance >= currentAmount && currentDebitBalance > 0;
+                      const canUseCredit = user?.hasCreditCard && currentCreditAvailable >= currentAmount;
+                      
+                      if (!canUseDebit && canUseCredit) {
+                        return (
+                          <p className="text-xs text-warning mt-2 text-center">
+                            ⚠️ Débito insuficiente para esse valor. Usando crédito.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
 
