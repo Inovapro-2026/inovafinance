@@ -674,6 +674,7 @@ export type Database = {
       users_matricula: {
         Row: {
           admin_affiliate_created_at: string | null
+          admin_affiliate_link_code: string | null
           advance_amount: number | null
           advance_day: number | null
           affiliate_balance: number | null
@@ -712,6 +713,7 @@ export type Database = {
         }
         Insert: {
           admin_affiliate_created_at?: string | null
+          admin_affiliate_link_code?: string | null
           advance_amount?: number | null
           advance_day?: number | null
           affiliate_balance?: number | null
@@ -750,6 +752,7 @@ export type Database = {
         }
         Update: {
           admin_affiliate_created_at?: string | null
+          admin_affiliate_link_code?: string | null
           advance_amount?: number | null
           advance_day?: number | null
           affiliate_balance?: number | null
