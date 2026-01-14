@@ -101,13 +101,50 @@ export default function Goals() {
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   };
 
+  const validateCPF = (cpf: string): boolean => {
+    const cleanCpf = cpf.replace(/\D/g, '');
+    
+    // Must have 11 digits
+    if (cleanCpf.length !== 11) return false;
+    
+    // Check for known invalid patterns (all same digits)
+    if (/^(\d)\1{10}$/.test(cleanCpf)) return false;
+    
+    // Validate first check digit
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(cleanCpf.charAt(i)) * (10 - i);
+    }
+    let remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(cleanCpf.charAt(9))) return false;
+    
+    // Validate second check digit
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(cleanCpf.charAt(i)) * (11 - i);
+    }
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(cleanCpf.charAt(10))) return false;
+    
+    return true;
+  };
+
   const handleSaveCpf = async () => {
     if (!user) return;
     const cleanCpf = newCpf.replace(/\D/g, '');
+    
     if (cleanCpf.length !== 11) {
       toast.error('CPF inválido. Deve ter 11 dígitos.');
       return;
     }
+    
+    if (!validateCPF(cleanCpf)) {
+      toast.error('CPF inválido. Verifique os dígitos.');
+      return;
+    }
+    
     await updateProfile(user.userId, { cpf: formatCPF(cleanCpf) });
     await refreshUser();
     setEditingCpf(false);
