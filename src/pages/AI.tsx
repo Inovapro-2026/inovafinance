@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Send, Sparkles, Volume2, VolumeX, Keyboard, X, Check, Edit3, ArrowDown, ArrowUp, Target, Utensils, Car, Gamepad2, ShoppingBag, Heart, GraduationCap, Receipt, MoreHorizontal, Briefcase, Laptop, TrendingUp, Gift, Wallet, CreditCard, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { calculateBalance, getTransactions, addTransaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/db';
 import { getScheduledPayments, getUserSalaryInfo, calculateMonthlySummary } from '@/lib/plannerDb';
 import { toast } from 'sonner';
@@ -427,16 +428,11 @@ export default function AI() {
     try {
       const context = await getFinancialContext();
 
-      const response = await fetch(
-        'https://pahvovxnhqsmcnqncmys.supabase.co/functions/v1/gemini-assistant',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, context }),
-        }
-      );
-
-      const data = await response.json();
+      const response = await supabase.functions.invoke('gemini-assistant', {
+        body: { message, context }
+      });
+      
+      const data = response.data;
 
       if (data.error) throw new Error(data.error);
 
