@@ -26,6 +26,9 @@ interface PaymentRequest {
   // PIX key for affiliate payouts
   pixKey?: string;
   pixKeyType?: string;
+  // Renewal fields
+  renewalMatricula?: number;
+  renewalDays?: number;
 }
 
 serve(async (req) => {
@@ -47,8 +50,29 @@ serve(async (req) => {
 
     const body: PaymentRequest = await req.json();
     
+    // Check if this is a renewal request - fetch user data from DB
+    let fullName = body.fullName;
+    let phone = body.phone;
+    let cpf = body.cpf;
+    let email = body.email;
+    
+    if (body.renewalMatricula) {
+      const { data: existingUser } = await supabase
+        .from('users_matricula')
+        .select('full_name, phone, cpf, email')
+        .eq('matricula', body.renewalMatricula)
+        .single();
+      
+      if (existingUser) {
+        fullName = existingUser.full_name || fullName;
+        phone = existingUser.phone || phone;
+        cpf = existingUser.cpf || cpf;
+        email = existingUser.email || email;
+      }
+    }
+    
     // Validate required fields
-    if (!body.fullName || !body.phone || !body.cpf) {
+    if (!fullName || !phone || !cpf) {
       return new Response(
         JSON.stringify({ error: 'Campos obrigatórios: nome, telefone e CPF' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -131,10 +155,10 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_temp_id: userTempId,
-        full_name: body.fullName,
-        email: body.email || null,
-        phone: body.phone,
-        cpf: body.cpf,
+        full_name: fullName,
+        email: email || null,
+        phone: phone,
+        cpf: cpf,
         amount: amount,
         payment_status: 'pending',
         affiliate_code: validAffiliateCode,
@@ -161,7 +185,7 @@ serve(async (req) => {
     }
 
     // Clean CPF - remove formatting
-    const cleanCpf = body.cpf.replace(/\D/g, '');
+    const cleanCpf = cpf.replace(/\D/g, '');
 
     // Check if using test credentials (starts with TEST-)
     const isTestMode = MP_ACCESS_TOKEN.startsWith('TEST-');
@@ -170,7 +194,7 @@ serve(async (req) => {
 
     // Mercado Pago sandbox requires a valid (often test-user) payer email.
     // We'll create a test user dynamically when using TEST- credentials.
-    let payerEmail = (body.email || '').trim();
+    let payerEmail = (email || '').trim();
 
     if (isTestMode) {
       const createTestUserRes = await fetch('https://api.mercadopago.com/users/test_user', {
@@ -204,8 +228,8 @@ serve(async (req) => {
       payment_method_id: 'pix',
       payer: {
         email: payerEmail,
-        first_name: body.fullName.split(' ')[0],
-        last_name: body.fullName.split(' ').slice(1).join(' ') || 'Cliente',
+        first_name: fullName.split(' ')[0],
+        last_name: fullName.split(' ').slice(1).join(' ') || 'Cliente',
         identification: {
           type: 'CPF',
           number: cleanCpf,
