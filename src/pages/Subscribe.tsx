@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Sparkles, ArrowRight, User, Phone, Mail, FileText, Wallet, Calendar, ChevronLeft, Loader2, CheckCircle2, AlertCircle, Copy, Check, QrCode, Clock, Tag, Users } from 'lucide-react';
+import { CreditCard, Sparkles, ArrowRight, User, Phone, Mail, FileText, Wallet, Calendar, ChevronLeft, Loader2, CheckCircle2, AlertCircle, Copy, Check, QrCode, Clock, Tag, Users, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,10 @@ import { Switch } from '@/components/ui/switch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { speakNative, stopNativeSpeaking } from '@/services/nativeTtsService';
 
 type Step = 'form' | 'processing' | 'pix' | 'success' | 'error' | 'trial_success';
+type FormStep = 'name' | 'email' | 'phone' | 'cpf' | 'salary' | 'creditCard' | 'affiliate' | 'coupon' | 'pixKey' | 'review';
 
 interface PixData {
   qrCode: string | null;
@@ -21,15 +23,31 @@ interface PixData {
 
 const SUPABASE_URL = "https://pahvovxnhqsmcnqncmys.supabase.co";
 
+// Step voice explanations
+const STEP_EXPLANATIONS: Record<FormStep, string> = {
+  name: 'Vamos começar! Digite seu nome completo. Este será usado para identificar sua conta.',
+  email: 'Agora digite seu e-mail. Este campo é opcional, mas recomendamos preencher para recuperação de conta.',
+  phone: 'Digite seu número de telefone com DDD. Usaremos para contato importante sobre sua conta.',
+  cpf: 'Agora digite seu CPF. Este documento é necessário para verificação de identidade.',
+  salary: 'Informe seu salário mensal e o dia do pagamento. Isso nos ajuda a organizar seu planejamento financeiro.',
+  creditCard: 'Você possui cartão de crédito? Se sim, ative a opção e informe o limite e dia de vencimento.',
+  affiliate: 'Tem um código de indicação? Digite aqui para ganhar desconto especial.',
+  coupon: 'Possui cupom de desconto? Digite o código para aplicar.',
+  pixKey: 'Como afiliado, você receberá comissões. Informe sua chave PIX para receber os pagamentos.',
+  review: 'Revise seus dados antes de finalizar. Confira se todas as informações estão corretas.'
+};
+
 export default function Subscribe() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>('form');
+  const [formStep, setFormStep] = useState<FormStep>('name');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [hasSpokenCurrentStep, setHasSpokenCurrentStep] = useState(false);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -76,6 +94,37 @@ export default function Subscribe() {
   const [pixData, setPixData] = useState<PixData | null>(null);
   const [userTempId, setUserTempId] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
+
+  // Speak the current step explanation
+  const speakStepExplanation = useCallback((currentStep: FormStep) => {
+    const explanation = STEP_EXPLANATIONS[currentStep];
+    if (explanation) {
+      // Small delay to let UI render first
+      setTimeout(() => {
+        speakNative(explanation);
+      }, 300);
+    }
+  }, []);
+
+  // Speak when form step changes
+  useEffect(() => {
+    if (step === 'form' && !hasSpokenCurrentStep) {
+      speakStepExplanation(formStep);
+      setHasSpokenCurrentStep(true);
+    }
+  }, [formStep, step, hasSpokenCurrentStep, speakStepExplanation]);
+
+  // Reset spoken flag when step changes
+  useEffect(() => {
+    setHasSpokenCurrentStep(false);
+  }, [formStep]);
+
+  // Stop speech when component unmounts
+  useEffect(() => {
+    return () => {
+      stopNativeSpeaking();
+    };
+  }, []);
 
   useEffect(() => {
     // Check if trial mode
@@ -425,6 +474,82 @@ export default function Subscribe() {
     throw new Error('Não foi possível gerar matrícula única');
   };
 
+  // Get form steps based on context
+  const getFormSteps = (): FormStep[] => {
+    const steps: FormStep[] = ['name', 'email', 'phone', 'cpf', 'salary', 'creditCard'];
+    
+    if (isAdminAffiliateLink) {
+      steps.push('pixKey');
+    } else if (!isTrialMode) {
+      steps.push('affiliate', 'coupon');
+    }
+    
+    steps.push('review');
+    return steps;
+  };
+
+  const formSteps = getFormSteps();
+  const currentStepIndex = formSteps.indexOf(formStep);
+  const isFirstStep = currentStepIndex === 0;
+  const isLastStep = currentStepIndex === formSteps.length - 1;
+
+  // Navigation functions
+  const goToNextStep = () => {
+    stopNativeSpeaking();
+    if (!isLastStep) {
+      const nextStep = formSteps[currentStepIndex + 1];
+      setFormStep(nextStep);
+    }
+  };
+
+  const goToPreviousStep = () => {
+    stopNativeSpeaking();
+    if (!isFirstStep) {
+      const prevStep = formSteps[currentStepIndex - 1];
+      setFormStep(prevStep);
+    }
+  };
+
+  // Validate current step before proceeding
+  const validateCurrentStep = (): boolean => {
+    setError('');
+    
+    switch (formStep) {
+      case 'name':
+        if (!fullName.trim()) {
+          setError('Nome completo é obrigatório');
+          return false;
+        }
+        break;
+      case 'phone':
+        if (!phone.trim() || phone.replace(/\D/g, '').length < 10) {
+          setError('Telefone válido é obrigatório');
+          return false;
+        }
+        break;
+      case 'cpf':
+        if (!cpf.trim() || cpf.replace(/\D/g, '').length !== 11) {
+          setError('CPF válido é obrigatório');
+          return false;
+        }
+        break;
+      case 'pixKey':
+        if (isAdminAffiliateLink && !pixKey.trim()) {
+          setError('Chave PIX é obrigatória para afiliados');
+          return false;
+        }
+        break;
+    }
+    
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (validateCurrentStep()) {
+      goToNextStep();
+    }
+  };
+
   // Handle FREE TRIAL registration (no payment)
   const handleTrialSignup = async () => {
     // Validate fields
@@ -450,6 +575,7 @@ export default function Subscribe() {
     setError('');
     setIsLoading(true);
     setStep('processing');
+    speakNative('Processando seu cadastro. Aguarde um momento.');
 
     try {
       // Generate unique matricula
@@ -496,36 +622,33 @@ export default function Subscribe() {
           // Mark as admin-created affiliate for 7-day rule tracking
           is_admin_affiliate: isAdminAffiliateLink,
           admin_affiliate_created_at: isAdminAffiliateLink ? now : null,
-          last_affiliate_sale_at: null,
-          affiliate_deactivated_at: null,
-        } as any);
+          admin_affiliate_link_code: adminAffiliateLinkCode,
+        });
 
-      if (insertError) throw insertError;
-
-      // If affiliate code, record the invite (pending - will be approved when they pay)
-      if (affiliateCode) {
-        await supabase
-          .from('affiliate_invites')
-          .insert({
-            inviter_matricula: affiliateCode,
-            invited_matricula: newMatricula,
-            status: 'pending'
-          });
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw new Error(insertError.message);
       }
 
+      // Clear localStorage affiliate ref after successful signup
+      localStorage.removeItem('inovafinance_affiliate_ref');
+      
       setTrialMatricula(newMatricula.toString());
       setStep('trial_success');
-      setIsLoading(false);
+      speakNative('Cadastro realizado com sucesso! Sua matrícula foi gerada.');
 
-    } catch (err: any) {
-      console.error('Trial registration error:', err);
-      setError(err.message || 'Erro ao criar conta');
+    } catch (e: any) {
+      console.error('Trial signup error:', e);
+      setError(e.message || 'Erro ao criar conta. Tente novamente.');
       setStep('form');
-      setIsLoading(false);
+      setFormStep('review');
     }
+
+    setIsLoading(false);
   };
 
-  const handleSubscribe = async () => {
+  // Handle PAID subscription (with PIX payment)
+  const handleSubmit = async () => {
     // Validate fields
     if (!fullName.trim()) {
       setError('Nome completo é obrigatório');
@@ -539,18 +662,14 @@ export default function Subscribe() {
       setError('CPF válido é obrigatório');
       return;
     }
-    
-    // Validate PIX key for affiliate links
-    if (isAdminAffiliateLink && !pixKey.trim()) {
-      setError('Chave PIX é obrigatória para afiliados');
-      return;
-    }
 
     setError('');
     setIsLoading(true);
     setStep('processing');
+    speakNative('Gerando seu código PIX. Aguarde um momento.');
 
     try {
+      // Call edge function to create PIX payment
       const response = await fetch(`${SUPABASE_URL}/functions/v1/create-pix-payment`, {
         method: 'POST',
         headers: {
@@ -560,807 +679,820 @@ export default function Subscribe() {
           fullName: fullName.trim(),
           email: email.trim() || null,
           phone: phone.trim(),
-          cpf: cpf.trim(),
-          hasCreditCard,
-          creditLimit: hasCreditCard ? parseCurrency(creditLimit) : 0,
-          creditDueDay: hasCreditCard ? parseInt(creditDueDay) : 5,
+          cpf: cpf.replace(/\D/g, ''),
           salaryAmount: parseCurrency(salaryAmount),
           salaryDay: parseInt(salaryDay) || 5,
           advanceAmount: parseCurrency(advanceAmount),
           advanceDay: advanceDay ? parseInt(advanceDay) : null,
+          hasCreditCard,
+          creditLimit: hasCreditCard ? parseCurrency(creditLimit) : 0,
+          creditDueDay: hasCreditCard ? parseInt(creditDueDay) : 5,
           affiliateCode: affiliateCode,
-          couponCode: couponValidated ? couponCode.toUpperCase().trim() : null,
-          // Flag to activate affiliate mode for new user
-          activateAffiliateMode: isAdminAffiliateLink,
+          couponCode: couponValidated ? couponCode : null,
+          amount: subscriptionAmount,
           adminAffiliateLinkCode: adminAffiliateLinkCode,
-          // PIX key for affiliate payouts
-          pixKey: isAdminAffiliateLink ? pixKey.trim() : null,
-          pixKeyType: isAdminAffiliateLink ? pixKeyType : null,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao criar pagamento PIX');
+        throw new Error(data.error || 'Erro ao criar pagamento');
       }
 
-      // Store data
-      setPixData(data.pix);
+      setPixData({
+        qrCode: data.qrCode,
+        qrCodeBase64: data.qrCodeBase64,
+        ticketUrl: data.ticketUrl,
+        expirationDate: data.expirationDate,
+      });
       setUserTempId(data.userTempId);
       setPaymentId(data.paymentId);
-      sessionStorage.setItem('payment_temp_id', data.userTempId);
-
       setStep('pix');
-      setIsLoading(false);
+      speakNative('Código PIX gerado com sucesso! Copie o código ou escaneie o QR Code para pagar.');
 
-    } catch (err: any) {
-      console.error('Subscription error:', err);
-      setError(err.message || 'Erro ao processar assinatura');
-      setStep('error');
-      setIsLoading(false);
+    } catch (e: any) {
+      console.error('Payment error:', e);
+      setError(e.message || 'Erro ao criar pagamento. Tente novamente.');
+      setStep('form');
+      setFormStep('review');
     }
+
+    setIsLoading(false);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl"
-          animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 10, repeat: Infinity }}
-        />
-      </div>
+  // Render step progress indicator
+  const renderProgressIndicator = () => {
+    const totalSteps = formSteps.length;
+    const progress = ((currentStepIndex + 1) / totalSteps) * 100;
 
-      <div className="w-full max-w-lg relative z-10">
-        <AnimatePresence mode="wait">
-          {step === 'form' && (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              {/* Header */}
-              <div className="text-center mb-8">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className={`w-20 h-20 ${isTrialMode ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : 'bg-gradient-to-br from-primary to-accent'} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}
-                >
-                  {isTrialMode ? (
-                    <Clock className="w-10 h-10 text-white" />
-                  ) : (
-                    <Sparkles className="w-10 h-10 text-primary-foreground" />
-                  )}
-                </motion.div>
-                <h1 className="text-3xl font-bold text-foreground">
-                  {isTrialMode ? 'Teste Grátis' : 'INOVAFINANCE'}
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  {isTrialMode ? '24 horas de acesso completo ao INOVAFINANCE' : 'Sua conta financeira inteligente'}
+    return (
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-muted-foreground">
+            Passo {currentStepIndex + 1} de {totalSteps}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {Math.round(progress)}%
+          </span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-primary to-accent"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Render current form step
+  const renderFormStep = () => {
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={formStep}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-4"
+        >
+          {formStep === 'name' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-4">
+                  <User className="w-8 h-8 text-primary-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold">Qual é o seu nome?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Digite seu nome completo
                 </p>
               </div>
+              <Input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Seu nome completo"
+                className="bg-background/50 text-center text-lg h-14"
+                autoFocus
+              />
+            </div>
+          )}
 
-              {/* Trial Benefits Banner */}
-              {isTrialMode && (
-                <GlassCard className="p-4 mb-6 bg-gradient-to-r from-emerald-500/10 to-primary/10 border-emerald-500/20">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                      <Sparkles className="w-5 h-5 text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">✨ Inclui voz natural ISA por 2 horas</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Após 2h, a voz muda para síntese do navegador. Assine para manter a voz premium!
-                      </p>
-                    </div>
-                  </div>
-                </GlassCard>
-              )}
+          {formStep === 'email' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Mail className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Qual é o seu e-mail?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Este campo é opcional
+                </p>
+              </div>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="bg-background/50 text-center text-lg h-14"
+                autoFocus
+              />
+            </div>
+          )}
 
-              {/* Admin Affiliate Link Badge - Prominent message for affiliate registration */}
-              {isAdminAffiliateLink && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="mb-6"
-                >
-                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-primary/20 to-purple-500/20 border-2 border-purple-500/40 p-5">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent" />
-                    <div className="relative flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-primary flex items-center justify-center shadow-lg shadow-purple-500/30">
-                        <Users className="w-7 h-7 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-lg font-bold text-white">
-                          🎉 Você foi indicado por um parceiro INOVAFINANCE
-                        </p>
-                        <p className="text-sm text-purple-200 mt-1">
-                          Ao se cadastrar, você terá acesso ao <span className="font-bold text-purple-300">programa de afiliados</span> com comissão de 50%!
-                        </p>
-                      </div>
-                      <CheckCircle2 className="w-8 h-8 text-emerald-400 flex-shrink-0" />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+          {formStep === 'phone' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Phone className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Qual é o seu telefone?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Digite com DDD
+                </p>
+              </div>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder="(11) 99999-9999"
+                maxLength={15}
+                className="bg-background/50 text-center text-lg h-14"
+                autoFocus
+              />
+            </div>
+          )}
 
-              {/* Regular Affiliate badge - Elegant referral message */}
-              {affiliateCode && !isAdminAffiliateLink && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="mb-6"
-                >
-                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20 p-4">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-                    <div className="relative flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-                        <Sparkles className="w-5 h-5 text-primary-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">
-                          Você foi indicado por um parceiro INOVAFINANCE
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Obrigado por fazer parte da nossa comunidade!
-                        </p>
-                      </div>
-                      <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+          {formStep === 'cpf' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Qual é o seu CPF?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Necessário para verificação
+                </p>
+              </div>
+              <Input
+                value={cpf}
+                onChange={(e) => setCpf(formatCPF(e.target.value))}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                className="bg-background/50 text-center text-lg h-14"
+                autoFocus
+              />
+            </div>
+          )}
 
-              {/* Price card - hide in trial mode, show FREE for admin affiliates */}
-              {!isTrialMode && (
-                <GlassCard className="p-6 mb-6">
-                  {isAdminAffiliateLink ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Conta de Afiliado</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold text-emerald-400">GRÁTIS</span>
-                            <span className="text-sm text-muted-foreground line-through">R$ 49,99</span>
-                          </div>
-                        </div>
-                        <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                          <Users className="w-7 h-7 text-white" />
-                        </div>
-                      </div>
-                      <p className="text-xs text-emerald-400 mt-3 flex items-center gap-1 font-semibold">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Sem mensalidade • Ganhe 50% de comissão por indicação
-                      </p>
-                      <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                        <p className="text-xs text-amber-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span className="font-semibold">Importante:</span> Faça sua primeira venda em 7 dias para manter a conta ativa
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Assinatura mensal</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold">R$ {subscriptionAmount.toFixed(2).replace('.', ',')}</span>
-                            {affiliateCode && (
-                              <span className="text-sm text-muted-foreground line-through">R$ 49,99</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="w-14 h-14 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center">
-                          <QrCode className="w-7 h-7 text-primary-foreground" />
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-                        <QrCode className="w-3 h-3" />
-                        Pagamento via PIX - Aprovação instantânea
-                      </p>
-                    </>
-                  )}
-                </GlassCard>
-              )}
+          {formStep === 'salary' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Wallet className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Informações do salário</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Para organizar seu planejamento
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-center block text-sm">Valor do salário</Label>
+                  <Input
+                    value={salaryAmount}
+                    onChange={(e) => setSalaryAmount(formatCurrency(e.target.value))}
+                    placeholder="0,00"
+                    className="bg-background/50 text-center"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-center block text-sm">Dia do pagamento</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={salaryDay}
+                    onChange={(e) => setSalaryDay(e.target.value)}
+                    className="bg-background/50 text-center"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="space-y-2">
+                  <Label className="text-center block text-sm">Vale/Adiantamento</Label>
+                  <Input
+                    value={advanceAmount}
+                    onChange={(e) => setAdvanceAmount(formatCurrency(e.target.value))}
+                    placeholder="0,00"
+                    className="bg-background/50 text-center"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-center block text-sm">Dia do vale</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={advanceDay}
+                    onChange={(e) => setAdvanceDay(e.target.value)}
+                    placeholder="--"
+                    className="bg-background/50 text-center"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
-              {/* Form */}
-              <GlassCard className="p-6">
-                <div className="space-y-4">
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2"
-                    >
-                      <AlertCircle className="w-4 h-4 text-destructive" />
-                      <span className="text-sm text-destructive">{error}</span>
-                    </motion.div>
-                  )}
+          {formStep === 'creditCard' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Cartão de crédito</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Simule seu cartão de crédito
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-center gap-4 p-4 bg-background/30 rounded-lg">
+                <span className="text-sm">Tenho cartão de crédito</span>
+                <Switch
+                  checked={hasCreditCard}
+                  onCheckedChange={setHasCreditCard}
+                />
+              </div>
 
-                  {/* Name */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Nome completo *
-                    </Label>
-                    <Input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Seu nome completo"
-                      className="bg-background/50"
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      E-mail (opcional)
-                    </Label>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="seu@email.com"
-                      className="bg-background/50"
-                    />
-                  </div>
-
-                  {/* Phone */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      Telefone *
-                    </Label>
-                    <Input
-                      value={phone}
-                      onChange={(e) => setPhone(formatPhone(e.target.value))}
-                      placeholder="(11) 99999-9999"
-                      maxLength={15}
-                      className="bg-background/50"
-                    />
-                  </div>
-
-                  {/* CPF */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      CPF *
-                    </Label>
-                    <Input
-                      value={cpf}
-                      onChange={(e) => setCpf(formatCPF(e.target.value))}
-                      placeholder="000.000.000-00"
-                      maxLength={14}
-                      className="bg-background/50"
-                    />
-                  </div>
-
-                  {/* PIX Key for Affiliate Registration */}
-                  {isAdminAffiliateLink && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="space-y-3 p-4 bg-gradient-to-r from-purple-500/10 to-primary/10 rounded-xl border border-purple-500/20"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Wallet className="w-5 h-5 text-purple-400" />
-                        <span className="text-sm font-bold text-purple-300">Dados para receber comissões</span>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label className="text-sm text-slate-300">Tipo de chave PIX *</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { value: 'cpf', label: 'CPF' },
-                            { value: 'email', label: 'E-mail' },
-                            { value: 'phone', label: 'Telefone' },
-                            { value: 'random', label: 'Aleatória' },
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => setPixKeyType(option.value as any)}
-                              className={`p-2 rounded-lg text-sm font-medium transition-all ${
-                                pixKeyType === option.value
-                                  ? 'bg-purple-500 text-white'
-                                  : 'bg-background/50 text-muted-foreground hover:bg-background/70'
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label className="text-sm text-slate-300">Chave PIX *</Label>
-                        <Input
-                          value={pixKey}
-                          onChange={(e) => setPixKey(e.target.value)}
-                          placeholder={
-                            pixKeyType === 'cpf' ? '000.000.000-00' :
-                            pixKeyType === 'email' ? 'seu@email.com' :
-                            pixKeyType === 'phone' ? '(00) 00000-0000' :
-                            'Chave aleatória'
-                          }
-                          className="bg-background/50"
-                        />
-                        <p className="text-xs text-purple-300/70">
-                          Esta chave será usada para receber suas comissões de 50% por indicação.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
+              <AnimatePresence>
+                {hasCreditCard && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="grid grid-cols-2 gap-3"
+                  >
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Wallet className="w-4 h-4" />
-                        Salário
-                      </Label>
+                      <Label className="text-center block text-sm">Limite</Label>
                       <Input
-                        value={salaryAmount}
-                        onChange={(e) => setSalaryAmount(formatCurrency(e.target.value))}
+                        value={creditLimit}
+                        onChange={(e) => setCreditLimit(formatCurrency(e.target.value))}
                         placeholder="0,00"
-                        className="bg-background/50"
+                        className="bg-background/50 text-center"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        Dia pagamento
-                      </Label>
+                      <Label className="text-center block text-sm">Dia vencimento</Label>
                       <Input
                         type="number"
                         min="1"
                         max="31"
-                        value={salaryDay}
-                        onChange={(e) => setSalaryDay(e.target.value)}
-                        className="bg-background/50"
+                        value={creditDueDay}
+                        onChange={(e) => setCreditDueDay(e.target.value)}
+                        className="bg-background/50 text-center"
                       />
                     </div>
-                  </div>
-
-                  {/* Credit card toggle */}
-                  <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="w-5 h-5 text-primary" />
-                      <span className="text-sm">Simular cartão de crédito</span>
-                    </div>
-                    <Switch
-                      checked={hasCreditCard}
-                      onCheckedChange={setHasCreditCard}
-                    />
-                  </div>
-
-                  {/* Credit card fields */}
-                  <AnimatePresence>
-                    {hasCreditCard && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="grid grid-cols-2 gap-3"
-                      >
-                        <div className="space-y-2">
-                          <Label>Limite</Label>
-                          <Input
-                            value={creditLimit}
-                            onChange={(e) => setCreditLimit(formatCurrency(e.target.value))}
-                            placeholder="0,00"
-                            className="bg-background/50"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Dia vencimento</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="31"
-                            value={creditDueDay}
-                            onChange={(e) => setCreditDueDay(e.target.value)}
-                            className="bg-background/50"
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Affiliate Code Manual Input - hide in trial mode */}
-                  {!isTrialMode && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      Código de Indicação (opcional)
-                    </Label>
-                    {affiliateCode ? (
-                      <div className="p-3 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            <span className="text-sm font-medium">
-                              Indicado por {affiliateName || `Matrícula ${affiliateCode}`}
-                            </span>
-                          </div>
-                          {!affiliateFromUrl && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={clearAffiliateCode}
-                              className="text-xs h-7"
-                            >
-                              Remover
-                            </Button>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Você foi indicado por um parceiro INOVAFINANCE
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          value={manualAffiliateCode}
-                          onChange={(e) => setManualAffiliateCode(e.target.value)}
-                          placeholder="Digite o código de indicação"
-                          className="bg-background/50"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleValidateManualAffiliate}
-                          disabled={isValidatingAffiliate || !manualAffiliateCode.trim()}
-                          className="shrink-0"
-                        >
-                          {isValidatingAffiliate ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            'Aplicar'
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  )}
-
-                  {/* Coupon code - hide in trial mode */}
-                  {!isTrialMode && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Tag className="w-4 h-4" />
-                      Cupom de Desconto (opcional)
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={couponCode}
-                        onChange={(e) => {
-                          setCouponCode(e.target.value.toUpperCase());
-                          setCouponValidated(false);
-                        }}
-                        placeholder="PROMO10"
-                        className="bg-background/50 uppercase"
-                        disabled={couponValidated}
-                      />
-                      <Button
-                        type="button"
-                        variant={couponValidated ? "secondary" : "outline"}
-                        onClick={couponValidated ? () => {
-                          setCouponCode('');
-                          setCouponValidated(false);
-                          setCouponDiscount(0);
-                          const currentBase = affiliateCode ? affiliatePrice : basePrice;
-                          setSubscriptionAmount(currentBase);
-                        } : validateCoupon}
-                        disabled={isValidatingCoupon || (!couponCode.trim() && !couponValidated)}
-                        className="shrink-0"
-                      >
-                        {isValidatingCoupon ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : couponValidated ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 mr-1 text-green-500" />
-                            Remover
-                          </>
-                        ) : (
-                          'Aplicar'
-                        )}
-                      </Button>
-                    </div>
-                    {couponValidated && (
-                      <p className="text-xs text-green-500 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Desconto de R$ {couponDiscount.toFixed(2).replace('.', ',')} aplicado!
-                      </p>
-                    )}
-                  </div>
-                  )}
-
-                  {/* Subscribe button - changes based on trial mode or admin affiliate */}
-                  <Button
-                    onClick={(isTrialMode || isAdminAffiliateLink) ? handleTrialSignup : handleSubscribe}
-                    disabled={isLoading}
-                    className={`w-full h-14 text-lg font-semibold ${(isTrialMode || isAdminAffiliateLink) ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gradient-to-r from-primary to-accent'} hover:opacity-90 transition-opacity mt-4`}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : isTrialMode ? (
-                      <>
-                        <Clock className="w-5 h-5 mr-2" />
-                        Criar conta grátis
-                        <ArrowRight className="w-5 h-5 ml-2" />
-                      </>
-                    ) : isAdminAffiliateLink ? (
-                      <>
-                        <Users className="w-5 h-5 mr-2" />
-                        Criar conta de afiliado
-                        <ArrowRight className="w-5 h-5 ml-2" />
-                      </>
-                    ) : (
-                      <>
-                        <QrCode className="w-5 h-5 mr-2" />
-                        Gerar PIX - R$ {subscriptionAmount.toFixed(2).replace('.', ',')}
-                        <ArrowRight className="w-5 h-5 ml-2" />
-                      </>
-                    )}
-                  </Button>
-
-                  {/* Login link */}
-                  <p className="text-center text-sm text-muted-foreground pt-2">
-                    Já tem uma conta?{' '}
-                    <button
-                      onClick={() => navigate('/login')}
-                      className="text-primary hover:underline"
-                    >
-                      Fazer login
-                    </button>
-                  </p>
-                </div>
-              </GlassCard>
-            </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
 
-          {step === 'processing' && (
-            <motion.div
-              key="processing"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="text-center"
-            >
-              <GlassCard className="p-8">
-                <Loader2 className={`w-16 h-16 ${isTrialMode ? 'text-emerald-500' : 'text-primary'} animate-spin mx-auto mb-4`} />
-                <h2 className="text-xl font-bold mb-2">{isTrialMode ? 'Criando sua conta...' : 'Gerando PIX...'}</h2>
-                <p className="text-muted-foreground">
-                  {isTrialMode ? 'Aguarde enquanto ativamos seu teste grátis' : 'Aguarde enquanto geramos seu QR Code'}
-                </p>
-              </GlassCard>
-            </motion.div>
-          )}
-
-          {step === 'pix' && pixData && (
-            <motion.div
-              key="pix"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-            >
-              {/* Header */}
+          {formStep === 'affiliate' && (
+            <div className="space-y-4">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <QrCode className="w-8 h-8 text-primary-foreground" />
+                <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold">Pague com PIX</h1>
-                <p className="text-muted-foreground mt-1">
-                  Escaneie o QR Code ou copie o código
+                <h3 className="text-lg font-semibold">Código de indicação</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Ganhe desconto com código de afiliado
                 </p>
               </div>
 
-              {/* QR Code Card */}
-              <GlassCard className="p-6 mb-4">
-                {/* Amount */}
-                <div className="text-center mb-6">
-                  <p className="text-sm text-muted-foreground">Valor a pagar</p>
-                  <p className="text-3xl font-bold text-primary">
-                    R$ {subscriptionAmount.toFixed(2).replace('.', ',')}
-                  </p>
-                </div>
-
-                {/* QR Code Image */}
-                {pixData.qrCodeBase64 && (
-                  <div className="flex justify-center mb-6">
-                    <div className="bg-white p-4 rounded-2xl shadow-lg">
-                      <img
-                        src={`data:image/png;base64,${pixData.qrCodeBase64}`}
-                        alt="QR Code PIX"
-                        className="w-48 h-48"
-                      />
-                    </div>
+              {affiliateCode ? (
+                <div className="p-4 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20 rounded-lg">
+                  <div className="flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <span className="text-sm font-medium">
+                      Indicado por {affiliateName || `Matrícula ${affiliateCode}`}
+                    </span>
                   </div>
-                )}
-
-                {/* Copy code button */}
-                {pixData.qrCode && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground text-center">
-                      Ou copie o código PIX:
-                    </p>
-                    <div className="relative">
-                      <div className="bg-muted/50 p-3 rounded-lg text-xs font-mono break-all max-h-20 overflow-y-auto">
-                        {pixData.qrCode}
-                      </div>
-                    </div>
+                  {!affiliateFromUrl && (
                     <Button
-                      onClick={copyPixCode}
-                      variant="outline"
-                      className="w-full"
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAffiliateCode}
+                      className="text-xs mt-2 w-full"
                     >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 mr-2 text-green-500" />
-                          Código copiado!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4 mr-2" />
-                          Copiar código PIX
-                        </>
-                      )}
+                      Remover código
                     </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={manualAffiliateCode}
+                    onChange={(e) => setManualAffiliateCode(e.target.value)}
+                    placeholder="Digite o código"
+                    className="bg-background/50 text-center"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleValidateManualAffiliate}
+                    disabled={isValidatingAffiliate || !manualAffiliateCode.trim()}
+                    className="shrink-0"
+                  >
+                    {isValidatingAffiliate ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Aplicar'
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {formStep === 'coupon' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Tag className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Cupom de desconto</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Tem um cupom? Digite aqui
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    setCouponValidated(false);
+                  }}
+                  placeholder="PROMO10"
+                  className="bg-background/50 text-center uppercase"
+                  disabled={couponValidated}
+                />
+                <Button
+                  type="button"
+                  variant={couponValidated ? "secondary" : "outline"}
+                  onClick={couponValidated ? () => {
+                    setCouponCode('');
+                    setCouponValidated(false);
+                    setCouponDiscount(0);
+                    const currentBase = affiliateCode ? affiliatePrice : basePrice;
+                    setSubscriptionAmount(currentBase);
+                  } : validateCoupon}
+                  disabled={isValidatingCoupon || (!couponValidated && !couponCode.trim())}
+                  className="shrink-0"
+                >
+                  {isValidatingCoupon ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : couponValidated ? (
+                    <>
+                      <Check className="w-4 h-4 mr-1" />
+                      Remover
+                    </>
+                  ) : (
+                    'Aplicar'
+                  )}
+                </Button>
+              </div>
+
+              {couponValidated && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-center"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto mb-1" />
+                  <p className="text-sm text-green-400">
+                    Desconto de R$ {couponDiscount.toFixed(2).replace('.', ',')} aplicado!
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {formStep === 'pixKey' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Wallet className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Chave PIX para comissões</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Receba suas comissões de 50%
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm text-center block">Tipo de chave PIX</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'cpf', label: 'CPF' },
+                    { value: 'email', label: 'E-mail' },
+                    { value: 'phone', label: 'Telefone' },
+                    { value: 'random', label: 'Aleatória' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setPixKeyType(option.value as any)}
+                      className={`p-3 rounded-lg text-sm font-medium transition-all ${
+                        pixKeyType === option.value
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-background/50 text-muted-foreground hover:bg-background/70'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm text-center block">Chave PIX</Label>
+                <Input
+                  value={pixKey}
+                  onChange={(e) => setPixKey(e.target.value)}
+                  placeholder={
+                    pixKeyType === 'cpf' ? '000.000.000-00' :
+                    pixKeyType === 'email' ? 'seu@email.com' :
+                    pixKeyType === 'phone' ? '(00) 00000-0000' :
+                    'Chave aleatória'
+                  }
+                  className="bg-background/50 text-center"
+                />
+              </div>
+            </div>
+          )}
+
+          {formStep === 'review' && (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold">Revise seus dados</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Confira se está tudo certo
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between p-3 bg-background/30 rounded-lg">
+                  <span className="text-sm text-muted-foreground">Nome</span>
+                  <span className="text-sm font-medium">{fullName || '-'}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-background/30 rounded-lg">
+                  <span className="text-sm text-muted-foreground">E-mail</span>
+                  <span className="text-sm font-medium">{email || 'Não informado'}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-background/30 rounded-lg">
+                  <span className="text-sm text-muted-foreground">Telefone</span>
+                  <span className="text-sm font-medium">{phone || '-'}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-background/30 rounded-lg">
+                  <span className="text-sm text-muted-foreground">CPF</span>
+                  <span className="text-sm font-medium">{cpf || '-'}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-background/30 rounded-lg">
+                  <span className="text-sm text-muted-foreground">Salário</span>
+                  <span className="text-sm font-medium">
+                    {salaryAmount ? `R$ ${salaryAmount}` : 'Não informado'}
+                  </span>
+                </div>
+                {hasCreditCard && (
+                  <div className="flex justify-between p-3 bg-background/30 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Limite do cartão</span>
+                    <span className="text-sm font-medium">R$ {creditLimit}</span>
                   </div>
                 )}
-              </GlassCard>
+              </div>
 
-              {/* Status info */}
-              <GlassCard className="p-4 mb-4 border-amber-500/30 bg-amber-500/10">
+              {/* Price summary */}
+              {!isTrialMode && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg border border-primary/20">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">
+                      {isAdminAffiliateLink ? 'Conta de Afiliado' : 'Assinatura mensal'}
+                    </span>
+                    <span className="text-xl font-bold">
+                      {isAdminAffiliateLink ? (
+                        <span className="text-emerald-400">GRÁTIS</span>
+                      ) : (
+                        `R$ ${subscriptionAmount.toFixed(2).replace('.', ',')}`
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
+  // Render navigation buttons
+  const renderNavigationButtons = () => {
+    return (
+      <div className="flex gap-3 mt-6">
+        {!isFirstStep && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goToPreviousStep}
+            className="flex-1"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar
+          </Button>
+        )}
+        
+        {isLastStep ? (
+          <Button
+            type="button"
+            onClick={isTrialMode || isAdminAffiliateLink ? handleTrialSignup : handleSubmit}
+            disabled={isLoading}
+            className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+            )}
+            {isTrialMode || isAdminAffiliateLink ? 'Criar conta' : 'Pagar com PIX'}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            onClick={handleNextStep}
+            className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+          >
+            Próximo
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  // Render processing step
+  if (step === 'processing') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background via-background to-background/95">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="relative">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="w-20 h-20 mx-auto mb-6"
+            >
+              <div className="w-full h-full rounded-full border-4 border-primary/20 border-t-primary" />
+            </motion.div>
+            <Sparkles className="w-8 h-8 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Processando...</h2>
+          <p className="text-muted-foreground">Aguarde um momento</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Render PIX payment step
+  if (step === 'pix' && pixData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background via-background to-background/95">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <GlassCard className="p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-4">
+                <QrCode className="w-8 h-8 text-primary-foreground" />
+              </div>
+              <h2 className="text-xl font-semibold">Pague com PIX</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Valor: R$ {subscriptionAmount.toFixed(2).replace('.', ',')}
+              </p>
+            </div>
+
+            {/* QR Code */}
+            {pixData.qrCodeBase64 && (
+              <div className="bg-white p-4 rounded-xl mx-auto w-fit mb-6">
+                <img 
+                  src={`data:image/png;base64,${pixData.qrCodeBase64}`} 
+                  alt="QR Code PIX"
+                  className="w-48 h-48"
+                />
+              </div>
+            )}
+
+            {/* Copy code button */}
+            <Button
+              onClick={copyPixCode}
+              variant="outline"
+              className="w-full mb-4"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Código copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copiar código PIX
+                </>
+              )}
+            </Button>
+
+            {/* Expiration info */}
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>Aguardando pagamento...</span>
+            </div>
+
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setStep('form');
+                setFormStep('review');
+              }}
+              className="w-full mt-4"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+          </GlassCard>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Render success step
+  if (step === 'success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background via-background to-background/95">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md text-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.2 }}
+            className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6"
+          >
+            <CheckCircle2 className="w-12 h-12 text-white" />
+          </motion.div>
+          <h2 className="text-2xl font-bold mb-2">Pagamento confirmado!</h2>
+          <p className="text-muted-foreground mb-6">
+            Sua conta foi criada com sucesso
+          </p>
+          <Button
+            onClick={() => navigate('/login')}
+            className="w-full bg-gradient-to-r from-primary to-accent"
+          >
+            Fazer login
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Render trial success step
+  if (step === 'trial_success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background via-background to-background/95">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md text-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.2 }}
+            className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6"
+          >
+            <CheckCircle2 className="w-12 h-12 text-white" />
+          </motion.div>
+          <h2 className="text-2xl font-bold mb-2">
+            {isAdminAffiliateLink ? 'Conta de afiliado criada!' : 'Conta criada com sucesso!'}
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            Sua matrícula é: <span className="font-bold text-primary">{trialMatricula}</span>
+          </p>
+          {isAdminAffiliateLink ? (
+            <p className="text-sm text-amber-400 mb-6">
+              Lembre-se: faça sua primeira venda em 7 dias para manter a conta ativa!
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mb-6">
+              Você tem 24 horas de teste gratuito
+            </p>
+          )}
+          <Button
+            onClick={() => navigate('/login')}
+            className="w-full bg-gradient-to-r from-primary to-accent"
+          >
+            Fazer login
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Render form step
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-background/95">
+      {/* Header */}
+      <div className="p-4 flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/')}
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Button>
+        <div>
+          <h1 className="text-lg font-semibold">
+            {isTrialMode ? 'Teste Grátis' : isAdminAffiliateLink ? 'Cadastro de Afiliado' : 'Criar Conta'}
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            {isTrialMode ? '24 horas gratuitas' : isAdminAffiliateLink ? 'Conta gratuita' : 'Assinatura mensal'}
+          </p>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Admin affiliate banner */}
+          {isAdminAffiliateLink && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4"
+            >
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20 p-4">
                 <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-amber-500 animate-pulse" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-400">Aguardando pagamento</p>
-                    <p className="text-xs text-muted-foreground">
-                      Assim que o pagamento for confirmado, você será redirecionado automaticamente
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+                    <Sparkles className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      Parceiro INOVAFINANCE
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Conta gratuita + 50% de comissão
                     </p>
                   </div>
+                  <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                 </div>
-              </GlassCard>
+              </div>
+            </motion.div>
+          )}
 
-              {/* Back button */}
-              <Button
-                onClick={() => {
-                  setStep('form');
-                  setPixData(null);
-                }}
-                variant="ghost"
-                className="w-full"
+          <GlassCard className="p-6">
+            {renderProgressIndicator()}
+            
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 mb-4"
               >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Voltar e alterar dados
-              </Button>
-            </motion.div>
-          )}
+                <AlertCircle className="w-4 h-4 text-destructive" />
+                <span className="text-sm text-destructive">{error}</span>
+              </motion.div>
+            )}
 
-          {step === 'success' && (
-            <motion.div
-              key="success"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="text-center"
-            >
-              <GlassCard className="p-8">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', delay: 0.2 }}
-                  className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4"
-                >
-                  <CheckCircle2 className="w-10 h-10 text-green-500" />
-                </motion.div>
-                <h2 className="text-2xl font-bold mb-2">Pagamento confirmado!</h2>
-                <p className="text-muted-foreground mb-6">
-                  Seu cadastro foi realizado com sucesso. Aguarde a aprovação do administrador para receber sua matrícula por WhatsApp.
-                </p>
-                <Button
-                  onClick={() => navigate('/login')}
-                  className="w-full bg-gradient-to-r from-primary to-accent"
-                >
-                  Ir para o Login
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </GlassCard>
-            </motion.div>
-          )}
-
-          {step === 'trial_success' && (
-            <motion.div
-              key="trial_success"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="text-center"
-            >
-              <GlassCard className="p-8">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', delay: 0.2 }}
-                  className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4"
-                >
-                  <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-                </motion.div>
-                <h2 className="text-2xl font-bold mb-2">Conta criada com sucesso!</h2>
-                <p className="text-muted-foreground mb-4">
-                  Seu teste grátis de 24 horas está ativo.
-                </p>
-                {trialMatricula && (
-                  <div className="bg-muted/50 rounded-xl p-4 mb-6">
-                    <p className="text-sm text-muted-foreground">Sua matrícula:</p>
-                    <p className="text-3xl font-bold text-primary">{trialMatricula}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Anote esta matrícula para fazer login
-                    </p>
-                  </div>
-                )}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4 text-emerald-500" />
-                    <span>Voz premium ISA por 2 horas</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span>Acesso completo por 24 horas</span>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => navigate('/login')}
-                  className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 mt-6"
-                >
-                  Ir para o Login
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </GlassCard>
-            </motion.div>
-          )}
-
-          {step === 'error' && (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="text-center"
-            >
-              <GlassCard className="p-8">
-                <div className="w-16 h-16 bg-destructive/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="w-8 h-8 text-destructive" />
-                </div>
-                <h2 className="text-xl font-bold mb-2">{isTrialMode ? 'Erro ao criar conta' : 'Erro no pagamento'}</h2>
-                <p className="text-muted-foreground mb-6">{error}</p>
-                <Button
-                  onClick={() => setStep('form')}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Tentar novamente
-                </Button>
-              </GlassCard>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {renderFormStep()}
+            {renderNavigationButtons()}
+          </GlassCard>
+        </div>
       </div>
     </div>
   );
