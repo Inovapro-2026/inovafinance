@@ -1,36 +1,84 @@
 import { motion } from 'framer-motion';
-import { Delete, Check } from 'lucide-react';
+import { Delete, Clipboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface NumericKeypadProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   maxLength?: number;
+  autoSubmit?: boolean;
 }
 
 export function NumericKeypad({ 
   value, 
   onChange, 
   onSubmit,
-  maxLength = 6 
+  maxLength = 6,
+  autoSubmit = false
 }: NumericKeypadProps) {
+  const { toast } = useToast();
+  
   const keys = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
-    ['delete', '0', 'submit'],
+    ['delete', '0', 'paste'],
   ];
 
   const handleKeyPress = (key: string) => {
     if (key === 'delete') {
       onChange(value.slice(0, -1));
-    } else if (key === 'submit') {
-      if (value.length > 0) {
-        onSubmit();
-      }
+    } else if (key === 'paste') {
+      handlePaste();
     } else if (value.length < maxLength) {
-      onChange(value + key);
+      const newValue = value + key;
+      onChange(newValue);
+      
+      // Auto submit when reaching maxLength
+      if (autoSubmit && newValue.length === maxLength) {
+        setTimeout(() => {
+          onSubmit();
+        }, 200);
+      }
+    }
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      // Extract only numbers
+      const numbers = text.replace(/\D/g, '');
+      
+      if (numbers.length > 0) {
+        const pastedValue = numbers.slice(0, maxLength);
+        onChange(pastedValue);
+        
+        toast({
+          title: "Código colado!",
+          description: `Matrícula ${pastedValue} inserida`,
+        });
+        
+        // Auto submit if we have the full length
+        if (autoSubmit && pastedValue.length === maxLength) {
+          setTimeout(() => {
+            onSubmit();
+          }, 300);
+        }
+      } else {
+        toast({
+          title: "Nenhum número encontrado",
+          description: "O texto copiado não contém números",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Não foi possível colar",
+        description: "Permita o acesso à área de transferência",
+        variant: "destructive"
+      });
     }
   };
 
@@ -38,26 +86,23 @@ export function NumericKeypad({
     <div className="grid grid-cols-3 gap-4 w-full max-w-xs mx-auto">
       {keys.flat().map((key, index) => {
         const isDelete = key === 'delete';
-        const isSubmit = key === 'submit';
-        const isDisabled = isSubmit && value.length === 0;
+        const isPaste = key === 'paste';
 
         return (
           <motion.button
             key={index}
             type="button"
-            disabled={isDisabled}
             className={cn(
               "keypad-btn",
-              isSubmit && !isDisabled && "bg-gradient-primary glow-primary",
-              isDisabled && "opacity-50 cursor-not-allowed"
+              isPaste && "bg-primary/20 hover:bg-primary/30"
             )}
             whileTap={{ scale: 0.95 }}
             onClick={() => handleKeyPress(key)}
           >
             {isDelete ? (
               <Delete className="w-6 h-6 text-muted-foreground" />
-            ) : isSubmit ? (
-              <Check className="w-6 h-6" />
+            ) : isPaste ? (
+              <Clipboard className="w-5 h-5 text-primary" />
             ) : (
               key
             )}
