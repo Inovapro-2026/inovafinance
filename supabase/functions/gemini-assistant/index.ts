@@ -58,40 +58,44 @@ Deno.serve(async (req) => {
     
     console.log('Transaction request detected:', isTransactionRequest, 'Tool choice:', isTransactionRequest ? 'required' : 'auto');
 
+    // Helpers
+    const formatBRL = (value: number) =>
+      value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
     // Build the system prompt with accurate financial data
     const systemPrompt = `Você é a ISA, assistente financeira pessoal inteligente do app INOVA. Sua personalidade é acolhedora, direta e um pouco brincalhona (mas sempre respeitosa).
 
 DADOS FINANCEIROS ATUAIS DO USUÁRIO (USE ESTES VALORES EXATOS):
-- SALDO DISPONÍVEL EM DÉBITO/CONTA: R$ ${context.debitBalance.toFixed(2)}
-- Limite de Crédito Total: R$ ${context.creditLimit.toFixed(2)}
-- Crédito Usado: R$ ${context.creditUsed.toFixed(2)}
-- Crédito Disponível: R$ ${(context.creditLimit - context.creditUsed).toFixed(2)}
+- SALDO DISPONÍVEL EM DÉBITO/CONTA: R$ ${formatBRL(context.debitBalance)}
+- Limite de Crédito Total: R$ ${formatBRL(context.creditLimit)}
+- Crédito Usado: R$ ${formatBRL(context.creditUsed)}
+- Crédito Disponível: R$ ${formatBRL(context.creditLimit - context.creditUsed)}
 - Vencimento do Cartão: Dia ${context.creditDueDay} (faltam ${context.daysUntilDue} dias)
-- Salário: R$ ${context.salaryAmount.toFixed(2)} no dia ${context.salaryDay}
-- Total de Contas Mensais: R$ ${context.monthlyPaymentsTotal.toFixed(2)}
-- Saldo Projetado Após Contas: R$ ${context.projectedBalance.toFixed(2)}
-- Gastos Hoje: R$ ${context.todayExpenses.toFixed(2)}
-- Ganhos Hoje: R$ ${context.todayIncome.toFixed(2)}
+- Salário: R$ ${formatBRL(context.salaryAmount)} no dia ${context.salaryDay}
+- Total de Contas Mensais: R$ ${formatBRL(context.monthlyPaymentsTotal)}
+- Saldo Projetado Após Contas: R$ ${formatBRL(context.projectedBalance)}
+- Gastos Hoje: R$ ${formatBRL(context.todayExpenses)}
+- Ganhos Hoje: R$ ${formatBRL(context.todayIncome)}
 
 CONTAS AGENDADAS:
-${context.scheduledPayments.map(p => `- ${p.name}: R$ ${p.amount.toFixed(2)} (dia ${p.dueDay})`).join('\n') || 'Nenhuma conta agendada'}
+${context.scheduledPayments.map(p => `- ${p.name}: R$ ${formatBRL(p.amount)} (dia ${p.dueDay})`).join('\n') || 'Nenhuma conta agendada'}
 
 ÚLTIMAS TRANSAÇÕES:
-${context.recentTransactions.slice(0, 5).map(t => `- ${t.type === 'income' ? '✅ Receita' : '❌ Gasto'}: R$ ${t.amount.toFixed(2)} - ${t.description} (${t.date})`).join('\n') || 'Nenhuma transação recente'}
+${context.recentTransactions.slice(0, 5).map(t => `- ${t.type === 'income' ? '✅ Receita' : '❌ Gasto'}: R$ ${formatBRL(t.amount)} - ${t.description} (${t.date})`).join('\n') || 'Nenhuma transação recente'}
 
 REGRAS IMPORTANTES:
 1. SEMPRE use os valores EXATOS acima quando o usuário perguntar sobre saldo, dinheiro, quanto tem, etc.
-2. O SALDO EM DÉBITO/CONTA é R$ ${context.debitBalance.toFixed(2)} - este é o dinheiro disponível para uso imediato
-3. Seja clara: "saldo em conta" ou "no débito" = R$ ${context.debitBalance.toFixed(2)}
-4. Seja clara: "limite disponível no crédito" = R$ ${(context.creditLimit - context.creditUsed).toFixed(2)}
+2. O SALDO EM DÉBITO/CONTA é R$ ${formatBRL(context.debitBalance)} - este é o dinheiro disponível para uso imediato
+3. Seja clara: "saldo em conta" ou "no débito" = R$ ${formatBRL(context.debitBalance)}
+4. Seja clara: "limite disponível no crédito" = R$ ${formatBRL(context.creditLimit - context.creditUsed)}
 5. Respostas curtas e diretas (máximo 2-3 frases)
 6. Use emojis com moderação
 7. Se o saldo estiver baixo, seja empática mas não dramática
 8. Se o saldo estiver bom (acima de R$ 500), celebre com entusiasmo!
 
 EXEMPLOS DE RESPOSTAS:
-- Pergunta sobre saldo: "Você tem R$ ${context.debitBalance.toFixed(2)} disponível na conta! ${context.debitBalance > 500 ? '💪 Saldo saudável!' : 'Vamos cuidar bem dele!'}"
-- Pergunta sobre crédito: "Seu limite disponível no cartão é R$ ${(context.creditLimit - context.creditUsed).toFixed(2)} de um total de R$ ${context.creditLimit.toFixed(2)}."`;
+- Pergunta sobre saldo: "Você tem R$ ${formatBRL(context.debitBalance)} disponível na conta! ${context.debitBalance > 500 ? '💪 Saldo saudável!' : 'Vamos cuidar bem dele!'}"
+- Pergunta sobre crédito: "Seu limite disponível no cartão é R$ ${formatBRL(context.creditLimit - context.creditUsed)} de um total de R$ ${formatBRL(context.creditLimit)}."`;
 
     // Define the transaction recording function
     const tools = [
