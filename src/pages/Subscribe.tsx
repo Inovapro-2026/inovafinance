@@ -515,8 +515,79 @@ export default function Subscribe() {
     }
   };
 
+  // Validate CPF format (basic validation)
+  const isValidCPF = (cpfValue: string): boolean => {
+    const numbers = cpfValue.replace(/\D/g, '');
+    if (numbers.length !== 11) return false;
+    
+    // Check for known invalid patterns
+    if (/^(\d)\1+$/.test(numbers)) return false;
+    
+    // Validate check digits
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(numbers[i]) * (10 - i);
+    }
+    let remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(numbers[9])) return false;
+    
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(numbers[i]) * (11 - i);
+    }
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(numbers[10])) return false;
+    
+    return true;
+  };
+
+  // Check for duplicate data in database
+  const checkDuplicateData = async (): Promise<{ isDuplicate: boolean; field: string }> => {
+    const cleanCpf = cpf.replace(/\D/g, '');
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    // Check CPF
+    const { data: cpfData } = await supabase
+      .from('users_matricula')
+      .select('matricula')
+      .eq('cpf', cleanCpf)
+      .maybeSingle();
+    
+    if (cpfData) {
+      return { isDuplicate: true, field: 'CPF' };
+    }
+    
+    // Check phone
+    const { data: phoneData } = await supabase
+      .from('users_matricula')
+      .select('matricula')
+      .eq('phone', cleanPhone)
+      .maybeSingle();
+    
+    if (phoneData) {
+      return { isDuplicate: true, field: 'telefone' };
+    }
+    
+    // Check email if provided
+    if (email.trim()) {
+      const { data: emailData } = await supabase
+        .from('users_matricula')
+        .select('matricula')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+      
+      if (emailData) {
+        return { isDuplicate: true, field: 'e-mail' };
+      }
+    }
+    
+    return { isDuplicate: false, field: '' };
+  };
+
   // Validate current step before proceeding
-  const validateCurrentStep = (): boolean => {
+  const validateCurrentStep = async (): Promise<boolean> => {
     setError('');
     
     switch (formStep) {
@@ -524,6 +595,19 @@ export default function Subscribe() {
         if (!fullName.trim()) {
           setError('Nome completo é obrigatório');
           return false;
+        }
+        if (fullName.trim().length < 3) {
+          setError('Nome deve ter pelo menos 3 caracteres');
+          return false;
+        }
+        break;
+      case 'email':
+        if (email.trim()) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(email.trim())) {
+            setError('E-mail inválido');
+            return false;
+          }
         }
         break;
       case 'phone':
@@ -534,7 +618,11 @@ export default function Subscribe() {
         break;
       case 'cpf':
         if (!cpf.trim() || cpf.replace(/\D/g, '').length !== 11) {
-          setError('CPF válido é obrigatório');
+          setError('CPF deve ter 11 dígitos');
+          return false;
+        }
+        if (!isValidCPF(cpf)) {
+          setError('CPF inválido. Verifique os dígitos.');
           return false;
         }
         break;
@@ -549,8 +637,14 @@ export default function Subscribe() {
     return true;
   };
 
-  const handleNextStep = () => {
-    if (validateCurrentStep()) {
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleNextStep = async () => {
+    setIsValidating(true);
+    const isValid = await validateCurrentStep();
+    setIsValidating(false);
+    
+    if (isValid) {
       goToNextStep();
     }
   };
@@ -566,8 +660,8 @@ export default function Subscribe() {
       setError('Telefone válido é obrigatório');
       return;
     }
-    if (!cpf.trim() || cpf.replace(/\D/g, '').length !== 11) {
-      setError('CPF válido é obrigatório');
+    if (!cpf.trim() || !isValidCPF(cpf)) {
+      setError('CPF inválido');
       return;
     }
     
@@ -580,9 +674,20 @@ export default function Subscribe() {
     setError('');
     setIsLoading(true);
     setStep('processing');
-    speakNative('Processando seu cadastro. Aguarde um momento.');
+    speakNative('Verificando seus dados. Aguarde um momento.');
 
     try {
+      // Check for duplicate data
+      const duplicateCheck = await checkDuplicateData();
+      if (duplicateCheck.isDuplicate) {
+        setError(`Este ${duplicateCheck.field} já está cadastrado em outra conta.`);
+        setStep('form');
+        setFormStep('review');
+        setIsLoading(false);
+        return;
+      }
+
+      speakNative('Processando seu cadastro.');
       // Generate unique matricula
       const newMatricula = await generateMatricula();
       const now = new Date().toISOString();
@@ -1294,10 +1399,14 @@ export default function Subscribe() {
           <Button
             type="button"
             onClick={handleNextStep}
+            disabled={isValidating}
             className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            Próximo
-            <ArrowRight className="w-4 h-4 ml-2" />
+            {isValidating ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : null}
+            {isValidating ? 'Validando...' : 'Próximo'}
+            {!isValidating && <ArrowRight className="w-4 h-4 ml-2" />}
           </Button>
         )}
       </div>
