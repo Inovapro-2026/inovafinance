@@ -147,11 +147,19 @@ serve(async (req) => {
 
         if (!isExpired && !usageLimitReached) {
           appliedCoupon = coupon.code;
+
+          // IMPORTANT: percentage coupons must be applied over the *current base price*
+          // (affiliate vs standard), not always over the standard price.
+          const priceForDiscount = validAffiliateCode ? affiliatePrice : defaultPrice;
+
           if (coupon.discount_type === 'percentage') {
-            couponDiscount = (defaultPrice * coupon.discount_value) / 100;
+            couponDiscount = (priceForDiscount * coupon.discount_value) / 100;
           } else {
             couponDiscount = coupon.discount_value;
           }
+
+          // Never allow discount to exceed the base price (prevents amount collapsing to 0.01)
+          couponDiscount = Math.min(couponDiscount, priceForDiscount);
 
           // Increment coupon usage
           await supabase

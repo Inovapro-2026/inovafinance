@@ -219,7 +219,8 @@ export default function Subscribe() {
           const response = await fetch(`${SUPABASE_URL}/functions/v1/check-payment-status?temp_id=${userTempId}`);
           const data = await response.json();
 
-          if (data.payment?.payment_status === 'approved') {
+          // check-payment-status returns: { paymentStatus, matricula, userStatus, ... }
+          if (data.paymentStatus === 'approved' && data.matricula && data.userStatus === 'approved') {
             setStep('success');
             clearInterval(interval);
           }
