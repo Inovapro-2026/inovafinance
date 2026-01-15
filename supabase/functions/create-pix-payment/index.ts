@@ -170,9 +170,18 @@ serve(async (req) => {
       }
     }
 
-    // Calculate final amount
+    // Calculate final amount - Mercado Pago PIX requires minimum R$ 1.00
     let basePrice = validAffiliateCode ? affiliatePrice : defaultPrice;
-    let amount = Math.max(0.01, basePrice - couponDiscount); // Minimum R$ 0.01
+    let amount = Math.max(1.00, basePrice - couponDiscount);
+    
+    // Ensure amount is a valid number with 2 decimal places
+    if (isNaN(amount) || !isFinite(amount)) {
+      console.error('Invalid amount calculated:', { basePrice, couponDiscount, amount });
+      amount = defaultPrice; // Fallback to default price
+    }
+    amount = Math.round(amount * 100) / 100; // Round to 2 decimal places
+    
+    console.log('Payment amount calculated:', { defaultPrice, affiliatePrice, basePrice, couponDiscount, finalAmount: amount });
 
     // Generate unique temp ID for this payment
     const userTempId = crypto.randomUUID();
