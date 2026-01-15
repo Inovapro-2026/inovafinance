@@ -910,12 +910,7 @@ export default function Subscribe() {
         throw new Error(data.error || 'Erro ao criar pagamento');
       }
 
-      setPixData({
-        qrCode: data.qrCode,
-        qrCodeBase64: data.qrCodeBase64,
-        ticketUrl: data.ticketUrl,
-        expirationDate: data.expirationDate,
-      });
+      setPixData(data.pix);
       setUserTempId(data.userTempId);
       setPaymentId(data.paymentId);
       setStep('pix');
