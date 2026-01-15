@@ -355,10 +355,12 @@ export type Database = {
           created_at: string
           credit_due_day: number | null
           credit_limit: number | null
+          current_credit_used: number | null
           email: string | null
           full_name: string
           has_credit_card: boolean | null
           id: string
+          initial_balance: number | null
           matricula: number | null
           mp_payment_id: string | null
           mp_preference_id: string | null
@@ -381,10 +383,12 @@ export type Database = {
           created_at?: string
           credit_due_day?: number | null
           credit_limit?: number | null
+          current_credit_used?: number | null
           email?: string | null
           full_name: string
           has_credit_card?: boolean | null
           id?: string
+          initial_balance?: number | null
           matricula?: number | null
           mp_payment_id?: string | null
           mp_preference_id?: string | null
@@ -407,10 +411,12 @@ export type Database = {
           created_at?: string
           credit_due_day?: number | null
           credit_limit?: number | null
+          current_credit_used?: number | null
           email?: string | null
           full_name?: string
           has_credit_card?: boolean | null
           id?: string
+          initial_balance?: number | null
           matricula?: number | null
           mp_payment_id?: string | null
           mp_preference_id?: string | null

@@ -18,6 +18,9 @@ interface PaymentRequest {
   salaryDay?: number;
   advanceAmount?: number;
   advanceDay?: number;
+  // Current balances
+  initialBalance?: number;
+  currentCreditUsed?: number;
   affiliateCode?: number;
   couponCode?: string;
   // Flag to activate affiliate mode for new user (from admin-generated link)
@@ -205,6 +208,9 @@ serve(async (req) => {
         salary_day: body.salaryDay || 5,
         advance_amount: body.advanceAmount || 0,
         advance_day: body.advanceDay || null,
+        // Current balances from signup form
+        initial_balance: body.initialBalance || 0,
+        current_credit_used: body.currentCreditUsed || 0,
         // Flag to activate affiliate mode for new user
         activate_affiliate_mode: body.activateAffiliateMode || false,
         admin_affiliate_link_code: body.adminAffiliateLinkCode || null,

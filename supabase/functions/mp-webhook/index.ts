@@ -124,6 +124,11 @@ serve(async (req) => {
       // Check if should activate affiliate mode (from admin-generated link)
       const activateAffiliate = payment.activate_affiliate_mode === true;
       
+      // Set subscription dates (30 days from now)
+      const now = new Date();
+      const subscriptionStartDate = now.toISOString();
+      const subscriptionEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      
       const { error: userError } = await supabase
         .from('users_matricula')
         .insert({
@@ -139,10 +144,16 @@ serve(async (req) => {
           salary_day: payment.salary_day,
           advance_amount: payment.advance_amount,
           advance_day: payment.advance_day,
-          initial_balance: 0,
+          // Use balances from signup form
+          initial_balance: payment.initial_balance || 0,
           credit_available: payment.has_credit_card ? payment.credit_limit : 0,
-          credit_used: 0,
+          credit_used: payment.current_credit_used || 0,
           user_status: 'approved', // AUTO APPROVED after payment
+          // Subscription dates
+          subscription_type: 'PREMIUM',
+          subscription_status: 'active',
+          subscription_start_date: subscriptionStartDate,
+          subscription_end_date: subscriptionEndDate,
           // Activate affiliate mode if coming from admin link
           is_affiliate: activateAffiliate,
           affiliate_code: activateAffiliate ? matricula.toString() : null,

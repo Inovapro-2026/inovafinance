@@ -900,6 +900,9 @@ export default function Subscribe() {
           hasCreditCard,
           creditLimit: hasCreditCard ? parseCurrency(creditLimit) : 0,
           creditDueDay: hasCreditCard ? parseInt(creditDueDay) : 5,
+          // Current balances
+          initialBalance: parseCurrency(currentDebitBalance),
+          currentCreditUsed: parseCurrency(currentCreditBalance),
           affiliateCode: affiliateCode,
           couponCode: couponValidated ? couponCode : null,
           amount: subscriptionAmount,
