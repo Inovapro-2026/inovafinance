@@ -15,7 +15,7 @@ import { SchedulePaymentModal } from '@/components/SchedulePaymentModal';
 import { addScheduledPayment } from '@/lib/plannerDb';
 import { ExpenseAnimation } from '@/components/animations/ExpenseAnimation';
 import { IncomeAnimation } from '@/components/animations/IncomeAnimation';
-import { IsaAvatar3D } from '@/components/avatar/IsaAvatar3D';
+import isaBackground from '@/assets/isa-background.jpg';
 
 interface FinancialContext {
   balance: number;
@@ -859,9 +859,12 @@ export default function AI() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        {/* Simple Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-950/90 via-blue-950/80 to-indigo-950/90">
-          <div className="absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-purple-900/30" />
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${isaBackground})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         </div>
 
         {/* Controls - Top Right */}
@@ -888,20 +891,6 @@ export default function AI() {
 
         {/* Main Content - Centered Microphone */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
-          {/* 3D Avatar */}
-          <motion.div
-            initial={{ y: -30, opacity: 0, scale: 0.8 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 150 }}
-            className="mb-4"
-          >
-            <IsaAvatar3D 
-              mood={avatarMood} 
-              isSpeaking={isSpeaking}
-              size="lg"
-            />
-          </motion.div>
-
           {/* Title */}
           <motion.div
             initial={{ y: -20, opacity: 0 }}
