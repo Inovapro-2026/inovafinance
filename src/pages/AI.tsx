@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { speakWithElevenLabs, stopElevenLabsSpeaking, isElevenLabsSpeaking } from '@/services/elevenlabsTtsService';
 import { SchedulePaymentModal } from '@/components/SchedulePaymentModal';
 import { addScheduledPayment } from '@/lib/plannerDb';
+import { ExpenseAnimation } from '@/components/animations/ExpenseAnimation';
+import { IncomeAnimation } from '@/components/animations/IncomeAnimation';
 
 interface FinancialContext {
   balance: number;
@@ -180,6 +182,8 @@ export default function AI() {
   const [displayBalance, setDisplayBalance] = useState<{ debit: number; credit: number } | null>(null);
   const [balanceVisible, setBalanceVisible] = useState(false);
   const [balanceAnimationType, setBalanceAnimationType] = useState<'query' | 'increase' | 'decrease' | null>(null);
+  const [showExpenseAnimation, setShowExpenseAnimation] = useState(false);
+  const [showIncomeAnimation, setShowIncomeAnimation] = useState(false);
   const recognitionRef = useRef<any>(null);
   const balanceHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -603,6 +607,11 @@ export default function AI() {
     }
   };
 
+  const handleTransactionAnimationComplete = useCallback(() => {
+    setShowExpenseAnimation(false);
+    setShowIncomeAnimation(false);
+  }, []);
+
   const confirmTransaction = async () => {
     if (!pendingTransaction || !user || isSaving) return;
 
@@ -625,6 +634,7 @@ export default function AI() {
     }
 
     setIsSaving(true);
+    const currentType = pendingTransaction.type;
 
     try {
       // For installment purchases, only register the first installment amount now
@@ -647,10 +657,6 @@ export default function AI() {
 
       await refreshUser();
 
-      // Show balance with animation based on transaction type
-      const animType = pendingTransaction.type === 'expense' ? 'decrease' : 'increase';
-      await showBalanceWithAnimation(animType);
-
       const methodText = pendingTransaction.type === 'expense'
         ? pendingTransaction.paymentMethod === 'credit' ? ' no crédito' : ' no débito'
         : '';
@@ -663,12 +669,26 @@ export default function AI() {
         description: `${pendingTransaction.type === 'expense' ? 'Gasto' : 'Ganho'} de R$ ${finalAmount.toFixed(2)}${methodText}${installmentText}`,
       });
 
-      speak(`Transação registrada com sucesso${methodText}${installmentText}!`);
+      // Reset states first
       setPendingTransaction(null);
       setEditingAmount(false);
       setInstallments(1);
       setShowInstallments(false);
       setStatusText('Pronta para ajudar');
+
+      // Trigger immersive animation based on transaction type
+      if (currentType === 'expense') {
+        setShowExpenseAnimation(true);
+      } else {
+        setShowIncomeAnimation(true);
+      }
+
+      // Show balance after animation
+      setTimeout(async () => {
+        const animType = currentType === 'expense' ? 'decrease' : 'increase';
+        await showBalanceWithAnimation(animType);
+      }, 3200);
+
     } finally {
       setIsSaving(false);
     }
@@ -1669,6 +1689,16 @@ export default function AI() {
           )}
         </AnimatePresence>
       </motion.div>
+
+      {/* Transaction Animations */}
+      <ExpenseAnimation 
+        isVisible={showExpenseAnimation} 
+        onComplete={handleTransactionAnimationComplete} 
+      />
+      <IncomeAnimation 
+        isVisible={showIncomeAnimation} 
+        onComplete={handleTransactionAnimationComplete} 
+      />
     </>
   );
 }

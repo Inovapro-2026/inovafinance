@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { transactionSounds } from '@/services/transactionSounds';
 
 interface IncomeAnimationProps {
   isVisible: boolean;
@@ -16,7 +17,11 @@ export const IncomeAnimation = ({ isVisible, onComplete }: IncomeAnimationProps)
       // Wallet appears
       const timer1 = setTimeout(() => setStage('open'), 600);
       // Wallet opens, money flies in
-      const timer2 = setTimeout(() => setStage('money'), 1200);
+      const timer2 = setTimeout(() => {
+        setStage('money');
+        // Play cash sound when money enters
+        transactionSounds.playIncomeSound();
+      }, 1200);
       // Money animation
       const timer3 = setTimeout(() => setStage('close'), 2200);
       // Wallet closes

@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { transactionSounds } from '@/services/transactionSounds';
 
 interface ExpenseAnimationProps {
   isVisible: boolean;
@@ -16,7 +17,11 @@ export const ExpenseAnimation = ({ isVisible, onComplete }: ExpenseAnimationProp
       // Card appears and rotates
       const timer1 = setTimeout(() => setStage('approach'), 800);
       // Card approaches machine
-      const timer2 = setTimeout(() => setStage('payment'), 1800);
+      const timer2 = setTimeout(() => {
+        setStage('payment');
+        // Play payment sound when card touches machine
+        transactionSounds.playExpenseSound();
+      }, 1800);
       // Payment confirmed
       const timer3 = setTimeout(() => setStage('done'), 2500);
       // Animation complete
