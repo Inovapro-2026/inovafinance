@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Shield, Wifi, Eye, EyeOff, Fingerprint, Calendar, AlertCircle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useAuth } from '@/contexts/AuthContext';
-import { calculateBalance } from '@/lib/db';
+import { calculateBalance, updateProfile } from '@/lib/db';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
@@ -15,6 +15,10 @@ import {
   disableBiometric
 } from '@/services/biometricService';
 import { useIsaGreeting } from '@/hooks/useIsaGreeting';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 export default function Card() {
   const { user, refreshUser } = useAuth();
@@ -24,6 +28,8 @@ export default function Card() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [selectedDueDate, setSelectedDueDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     if (user) {
@@ -131,6 +137,16 @@ export default function Card() {
     const diffTime = dueDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
+  };
+
+  const handleDueDateChange = async (date: Date | undefined) => {
+    if (!date || !user) return;
+    
+    const newDueDay = date.getDate();
+    await updateProfile(user.userId, { creditDueDay: newDueDay });
+    await refreshUser();
+    setDueDateOpen(false);
+    toast.success(`Data de vencimento alterada para dia ${newDueDay}`);
   };
 
   const daysUntilDue = getDaysUntilDue();
@@ -346,31 +362,48 @@ export default function Card() {
           </div>
         </GlassCard>
 
-        {/* Data de Vencimento */}
-        <GlassCard className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-warning/20 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-warning" />
+        {/* Data de Vencimento - Clicável */}
+        <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+          <PopoverTrigger asChild>
+            <GlassCard className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-warning/20 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-warning" />
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Data limite</p>
+                    <p className="font-medium text-sm">{getDueDate()}</p>
+                  </div>
+                </div>
+                {daysUntilDue !== null && (
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    daysUntilDue > 7 
+                      ? 'text-success bg-success/20' 
+                      : daysUntilDue > 0 
+                      ? 'text-warning bg-warning/20'
+                      : 'text-destructive bg-destructive/20'
+                  }`}>
+                    {daysUntilDue > 0 ? `${daysUntilDue} dias` : 'Vencida'}
+                  </span>
+                )}
               </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Data limite</p>
-                <p className="font-medium text-sm">{getDueDate()}</p>
-              </div>
+            </GlassCard>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 z-50" align="center">
+            <div className="p-3 border-b border-border">
+              <p className="text-sm font-medium">Alterar dia de vencimento</p>
+              <p className="text-xs text-muted-foreground">Escolha o dia do mês</p>
             </div>
-            {daysUntilDue !== null && (
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                daysUntilDue > 7 
-                  ? 'text-success bg-success/20' 
-                  : daysUntilDue > 0 
-                  ? 'text-warning bg-warning/20'
-                  : 'text-destructive bg-destructive/20'
-              }`}>
-                {daysUntilDue > 0 ? `${daysUntilDue} dias` : 'Vencida'}
-              </span>
-            )}
-          </div>
-        </GlassCard>
+            <CalendarComponent
+              mode="single"
+              selected={selectedDueDate}
+              onSelect={handleDueDateChange}
+              locale={ptBR}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
 
         {/* Biometria */}
         {biometricAvailable && (
