@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { BottomNav } from "./components/BottomNav";
-import { SplashScreen } from "./components/SplashScreen";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Cadastros from "./pages/Cadastros";
@@ -27,8 +25,6 @@ import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
-
-const SPLASH_SHOWN_KEY = 'inovabank_splash_shown';
 
 function AppRoutes() {
   const location = useLocation();
@@ -62,30 +58,6 @@ function AppRoutes() {
   );
 }
 
-function AppContent() {
-  const [showSplash, setShowSplash] = useState(false);
-
-  useEffect(() => {
-    // Check if splash was shown in this session
-    const splashShown = sessionStorage.getItem(SPLASH_SHOWN_KEY);
-    if (!splashShown) {
-      setShowSplash(true);
-    }
-  }, []);
-
-  const handleSplashComplete = () => {
-    sessionStorage.setItem(SPLASH_SHOWN_KEY, 'true');
-    setShowSplash(false);
-  };
-
-  return (
-    <>
-      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
-      {!showSplash && <AppRoutes />}
-    </>
-  );
-}
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -93,7 +65,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppContent />
+          <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
