@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import introVideo from '@/assets/intro-video.mp4';
+import introAudio from '@/assets/intro-audio.mp3';
 
 interface VideoSplashProps {
   onComplete: () => void;
@@ -7,16 +8,28 @@ interface VideoSplashProps {
 
 export function VideoSplash({ onComplete }: VideoSplashProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    const audio = audioRef.current;
+    if (!video || !audio) return;
 
-    // Auto-play video
-    video.play().catch(console.error);
+    // Auto-play video and audio together
+    const playMedia = async () => {
+      try {
+        await Promise.all([video.play(), audio.play()]);
+      } catch (error) {
+        console.error('Error playing media:', error);
+      }
+    };
 
-    // When video ends, call onComplete
+    playMedia();
+
+    // When video ends, stop audio and call onComplete
     const handleEnded = () => {
+      audio.pause();
+      audio.currentTime = 0;
       onComplete();
     };
 
@@ -24,6 +37,7 @@ export function VideoSplash({ onComplete }: VideoSplashProps) {
 
     return () => {
       video.removeEventListener('ended', handleEnded);
+      audio.pause();
     };
   }, [onComplete]);
 
@@ -33,9 +47,11 @@ export function VideoSplash({ onComplete }: VideoSplashProps) {
         ref={videoRef}
         src={introVideo}
         className="w-full h-full object-cover"
+        muted
         playsInline
         autoPlay
       />
+      <audio ref={audioRef} src={introAudio} />
     </div>
   );
 }
