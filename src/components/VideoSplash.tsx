@@ -21,35 +21,48 @@ export function VideoSplash({ onComplete }: VideoSplashProps) {
         await Promise.all([video.play(), audio.play()]);
       } catch (error) {
         console.error('Error playing media:', error);
+        // If autoplay fails, go to login after a short delay
+        setTimeout(onComplete, 1000);
       }
     };
 
     playMedia();
 
-    // When video ends, stop audio and call onComplete
-    const handleEnded = () => {
-      audio.pause();
-      audio.currentTime = 0;
+    // When AUDIO ends, stop video and call onComplete
+    const handleAudioEnded = () => {
+      video.pause();
       onComplete();
     };
 
-    video.addEventListener('ended', handleEnded);
+    // Loop video if it ends before audio
+    const handleVideoEnded = () => {
+      if (audio && !audio.ended) {
+        video.currentTime = 0;
+        video.play().catch(console.error);
+      }
+    };
+
+    audio.addEventListener('ended', handleAudioEnded);
+    video.addEventListener('ended', handleVideoEnded);
 
     return () => {
-      video.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('ended', handleAudioEnded);
+      video.removeEventListener('ended', handleVideoEnded);
       audio.pause();
+      video.pause();
     };
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden">
       <video
         ref={videoRef}
         src={introVideo}
-        className="w-full h-full object-cover"
+        className="min-w-full min-h-full w-auto h-auto object-cover absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         muted
         playsInline
         autoPlay
+        loop={false}
       />
       <audio ref={audioRef} src={introAudio} />
     </div>
