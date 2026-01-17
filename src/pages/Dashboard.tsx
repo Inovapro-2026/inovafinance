@@ -12,7 +12,8 @@ import {
   Receipt,
   ChevronRight,
   Volume2,
-  VolumeX
+  VolumeX,
+  MessageCircle
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +26,14 @@ import { isVoiceEnabled, setVoiceEnabled } from '@/services/isaVoiceService';
 import { Switch } from '@/components/ui/switch';
 
 const CHART_COLORS = ['#7A5CFA', '#4A90FF', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6'];
+
+const WHATSAPP_NUMBER = '5511978197645';
+const WHATSAPP_MESSAGE = 'Olá! Preciso de ajuda com o INOVAFINANCE';
+
+const openWhatsAppSupport = () => {
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
+  window.open(url, '_blank');
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -164,6 +173,16 @@ export default function Dashboard() {
       initial="hidden"
       animate="visible"
     >
+      {/* Floating WhatsApp Support Button - Only on Dashboard */}
+      <motion.button
+        onClick={openWhatsAppSupport}
+        whileTap={{ scale: 0.95 }}
+        className="fixed bottom-24 right-4 w-12 h-12 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center z-50"
+        aria-label="Suporte WhatsApp"
+      >
+        <MessageCircle className="w-6 h-6 text-white" />
+      </motion.button>
+
       {/* Header */}
       <motion.div variants={itemVariants} className="mb-6 flex items-center justify-between">
         <div>

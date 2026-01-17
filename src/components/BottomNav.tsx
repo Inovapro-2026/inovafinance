@@ -5,18 +5,9 @@ import {
   CreditCard, 
   Mic,
   User,
-  Calendar,
-  MessageCircle
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const WHATSAPP_NUMBER = '5511978197645';
-const WHATSAPP_MESSAGE = 'Olá! Preciso de ajuda com o INOVAFINANCE';
-
-const openWhatsAppSupport = () => {
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
-  window.open(url, '_blank');
-};
 
 export function BottomNav() {
   const location = useLocation();
@@ -31,15 +22,6 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
-      {/* Floating WhatsApp Support Button */}
-      <motion.button
-        onClick={openWhatsAppSupport}
-        whileTap={{ scale: 0.95 }}
-        className="absolute -top-16 right-4 w-12 h-12 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center z-50"
-        aria-label="Suporte WhatsApp"
-      >
-        <MessageCircle className="w-6 h-6 text-white" />
-      </motion.button>
 
       {/* Background */}
       <div className="absolute inset-0 bg-[#f5f5f0] dark:bg-[#1a1a1a] rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)]" />
