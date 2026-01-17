@@ -75,9 +75,9 @@ export default function Card() {
     setCreditUsed(used);
   };
 
-  const creditLimit = user?.creditLimit || 5000;
-  const availableCredit = creditLimit - (user?.creditUsed || 0);
-  const creditPercentUsed = ((user?.creditUsed || 0) / creditLimit) * 100;
+  const creditLimit = user?.creditLimit || 0;
+  const availableCredit = Math.max(0, creditLimit - (user?.creditUsed || 0));
+  const creditPercentUsed = creditLimit > 0 ? ((user?.creditUsed || 0) / creditLimit) * 100 : 0;
 
   // ISA greeting for Card page
   useIsaGreeting({

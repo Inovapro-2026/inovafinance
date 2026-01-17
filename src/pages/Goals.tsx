@@ -21,11 +21,13 @@ export default function Goals() {
   const [activeTab, setActiveTab] = useState<'profile' | 'goals'>('profile');
   const [editingName, setEditingName] = useState(false);
   const [editingBalance, setEditingBalance] = useState(false);
+  const [editingCreditLimit, setEditingCreditLimit] = useState(false);
   const [editingSalary, setEditingSalary] = useState(false);
   const [editingSalaryDay, setEditingSalaryDay] = useState(false);
   const [editingCpf, setEditingCpf] = useState(false);
   const [newName, setNewName] = useState('');
   const [newBalance, setNewBalance] = useState('');
+  const [newCreditLimit, setNewCreditLimit] = useState('');
   const [newSalary, setNewSalary] = useState('');
   const [newSalaryDay, setNewSalaryDay] = useState('');
   const [newCpf, setNewCpf] = useState('');
@@ -52,6 +54,7 @@ export default function Goals() {
       loadSalaryInfo();
       setNewName(user.fullName || '');
       setNewBalance(user.initialBalance?.toString() || '0');
+      setNewCreditLimit(user.creditLimit?.toString() || '0');
       setNewCpf(user.cpf || '');
     }
   }, [user]);
@@ -91,6 +94,19 @@ export default function Goals() {
     await refreshUser();
     setEditingBalance(false);
     toast.success('Saldo atualizado!');
+  };
+
+  const handleSaveCreditLimit = async () => {
+    if (!user) return;
+    const limit = parseFloat(newCreditLimit);
+    if (isNaN(limit) || limit < 0) {
+      toast.error('Valor inválido');
+      return;
+    }
+    await updateProfile(user.userId, { creditLimit: limit, creditAvailable: limit - (user.creditUsed || 0) });
+    await refreshUser();
+    setEditingCreditLimit(false);
+    toast.success('Limite de crédito atualizado!');
   };
 
   const formatCPF = (value: string) => {
@@ -455,7 +471,7 @@ export default function Goals() {
             </div>
           </GlassCard>
 
-          {/* Limite Crédito - Bloqueado */}
+          {/* Limite Crédito - Editável */}
           <GlassCard className="p-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-warning/20 flex items-center justify-center">
@@ -463,9 +479,49 @@ export default function Goals() {
               </div>
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground mb-1">Limite de Crédito</p>
-                <p className="font-semibold text-lg">{formatCurrency(user?.creditLimit || 0)}</p>
+                {editingCreditLimit ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">R$</span>
+                    <Input
+                      type="number"
+                      value={newCreditLimit}
+                      onChange={(e) => setNewCreditLimit(e.target.value)}
+                      className="h-8 bg-muted/50 border-primary w-32"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <p className="font-semibold text-lg">
+                    {formatCurrency(user?.creditLimit || 0)}
+                  </p>
+                )}
               </div>
-              <Lock className="w-5 h-5 text-muted-foreground" />
+              {editingCreditLimit ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingCreditLimit(false);
+                      setNewCreditLimit(user?.creditLimit?.toString() || '0');
+                    }}
+                    className="p-2 rounded-lg bg-muted hover:bg-muted/80"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleSaveCreditLimit}
+                    className="p-2 rounded-lg bg-primary text-primary-foreground"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditingCreditLimit(true)}
+                  className="p-2 rounded-lg bg-muted hover:bg-muted/80"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </GlassCard>
 

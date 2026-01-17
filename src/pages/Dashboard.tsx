@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   TrendingUp,
   TrendingDown,
@@ -37,6 +37,7 @@ const openWhatsAppSupport = () => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, refreshUser } = useAuth();
   const [balance, setBalance] = useState(0);
   const [debitBalance, setDebitBalance] = useState(0);
@@ -46,6 +47,9 @@ export default function Dashboard() {
   const [categoryData, setCategoryData] = useState<{ name: string; value: number }[]>([]);
   const [chartData, setChartData] = useState<{ date: string; balance: number }[]>([]);
   const [voiceEnabled, setVoiceEnabledState] = useState(isVoiceEnabled());
+  
+  // Only show WhatsApp button on home route
+  const isHomePage = location.pathname === '/';
 
   // INOVA greeting on dashboard access
   useIsaGreeting({
@@ -173,15 +177,17 @@ export default function Dashboard() {
       initial="hidden"
       animate="visible"
     >
-      {/* Floating WhatsApp Support Button - Only on Dashboard */}
-      <motion.button
-        onClick={openWhatsAppSupport}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-24 right-4 w-12 h-12 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center z-50"
-        aria-label="Suporte WhatsApp"
-      >
-        <MessageCircle className="w-6 h-6 text-white" />
-      </motion.button>
+      {/* Floating WhatsApp Support Button - Only on Home */}
+      {isHomePage && (
+        <motion.button
+          onClick={openWhatsAppSupport}
+          whileTap={{ scale: 0.95 }}
+          className="fixed bottom-24 right-4 w-12 h-12 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center z-50"
+          aria-label="Suporte WhatsApp"
+        >
+          <MessageCircle className="w-6 h-6 text-white" />
+        </motion.button>
+      )}
 
       {/* Header */}
       <motion.div variants={itemVariants} className="mb-6 flex items-center justify-between">
