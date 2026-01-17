@@ -15,6 +15,7 @@ import { SchedulePaymentModal } from '@/components/SchedulePaymentModal';
 import { addScheduledPayment } from '@/lib/plannerDb';
 import { ExpenseAnimation } from '@/components/animations/ExpenseAnimation';
 import { IncomeAnimation } from '@/components/animations/IncomeAnimation';
+import { IsaAvatar3D } from '@/components/avatar/IsaAvatar3D';
 
 interface FinancialContext {
   balance: number;
@@ -184,8 +185,33 @@ export default function AI() {
   const [balanceAnimationType, setBalanceAnimationType] = useState<'query' | 'increase' | 'decrease' | null>(null);
   const [showExpenseAnimation, setShowExpenseAnimation] = useState(false);
   const [showIncomeAnimation, setShowIncomeAnimation] = useState(false);
+  const [avatarMood, setAvatarMood] = useState<'idle' | 'listening' | 'thinking' | 'happy' | 'serious' | 'angry' | 'celebration'>('idle');
   const recognitionRef = useRef<any>(null);
   const balanceHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update avatar mood based on state
+  useEffect(() => {
+    if (isListening) {
+      setAvatarMood('listening');
+    } else if (isLoading) {
+      setAvatarMood('thinking');
+    } else if (showIncomeAnimation || balanceAnimationType === 'increase') {
+      setAvatarMood('celebration');
+    } else if (showExpenseAnimation || balanceAnimationType === 'decrease') {
+      setAvatarMood('serious');
+    } else if (pendingTransaction?.type === 'expense') {
+      const amount = parseFloat(editedAmount) || pendingTransaction.amount;
+      if (amount > 500) {
+        setAvatarMood('angry');
+      } else {
+        setAvatarMood('serious');
+      }
+    } else if (pendingTransaction?.type === 'income') {
+      setAvatarMood('happy');
+    } else {
+      setAvatarMood('idle');
+    }
+  }, [isListening, isLoading, showIncomeAnimation, showExpenseAnimation, balanceAnimationType, pendingTransaction, editedAmount]);
 
   // Function to show balance with animation and auto-hide after 5 seconds
   const showBalanceWithAnimation = useCallback(async (type: 'query' | 'increase' | 'decrease') => {
@@ -862,14 +888,28 @@ export default function AI() {
 
         {/* Main Content - Centered Microphone */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
+          {/* 3D Avatar */}
+          <motion.div
+            initial={{ y: -30, opacity: 0, scale: 0.8 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, type: 'spring', stiffness: 150 }}
+            className="mb-4"
+          >
+            <IsaAvatar3D 
+              mood={avatarMood} 
+              isSpeaking={isSpeaking}
+              size="lg"
+            />
+          </motion.div>
+
           {/* Title */}
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="text-center mb-8"
+            className="text-center mb-6"
           >
             <motion.h1
-              className="font-display text-3xl font-bold gradient-text mb-2"
+              className="font-display text-2xl font-bold gradient-text mb-1"
               animate={isListening || isSpeaking ? {
                 textShadow: ['0 0 20px hsl(var(--primary) / 0.5)', '0 0 40px hsl(var(--primary) / 0.8)', '0 0 20px hsl(var(--primary) / 0.5)']
               } : {}}
@@ -877,7 +917,7 @@ export default function AI() {
             >
               INOVA
             </motion.h1>
-            <p className="text-muted-foreground text-sm">Sua Assistente Financeira Inteligente</p>
+            <p className="text-muted-foreground text-xs">Sua Assistente Financeira Inteligente</p>
           </motion.div>
 
           {/* Balance Display Card - Only visible when queried or after transaction */}
