@@ -33,7 +33,6 @@ export function VideoSplash({ onComplete }: VideoSplashProps) {
         ref={videoRef}
         src={introVideo}
         className="w-full h-full object-cover"
-        muted
         playsInline
         autoPlay
       />
