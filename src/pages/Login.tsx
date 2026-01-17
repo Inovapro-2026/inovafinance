@@ -67,7 +67,7 @@ const AnimatedBackground = memo(({ introPhase }: { introPhase: string }) => (
 AnimatedBackground.displayName = 'AnimatedBackground';
 
 export default function Login() {
-  const [introPhase, setIntroPhase] = useState<'logo' | 'tagline' | 'content'>('logo');
+  const [introPhase, setIntroPhase] = useState<'logo' | 'tagline' | 'content'>('content');
   const [step, setStep] = useState<Step>('matricula');
   const [matricula, setMatricula] = useState('');
   const [generatedMatricula, setGeneratedMatricula] = useState('');
@@ -92,24 +92,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  // Intro animation sequence otimizada - tempos reduzidos
-  useEffect(() => {
-    // Phase 1: Logo appears (already showing)
-    // Phase 2: After 0.8s, show tagline (reduzido de 1.5s)
-    const taglineTimer = setTimeout(() => {
-      setIntroPhase('tagline');
-    }, 800);
-
-    // Phase 3: After 1.6s total, show content (reduzido de 3s)
-    const contentTimer = setTimeout(() => {
-      setIntroPhase('content');
-    }, 1600);
-
-    return () => {
-      clearTimeout(taglineTimer);
-      clearTimeout(contentTimer);
-    };
-  }, []);
+  // Intro animation removed - go straight to content
 
   // Check biometric availability on mount
   useEffect(() => {
