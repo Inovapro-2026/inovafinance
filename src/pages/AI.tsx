@@ -217,10 +217,10 @@ export default function AI() {
   const showBalanceWithAnimation = useCallback(async (type: 'query' | 'increase' | 'decrease') => {
     if (!user) return;
     
-    const { debitBalance } = await calculateBalance(user.userId, user.initialBalance);
+    // Use initialBalance (same as Dashboard "Saldo Débito") instead of calculated debitBalance
     const creditAvailable = (user.creditLimit || 0) - (user.creditUsed || 0);
     setDisplayBalance({
-      debit: Math.max(0, debitBalance),
+      debit: Math.max(0, user.initialBalance || 0),
       credit: Math.max(0, creditAvailable)
     });
     
