@@ -2,9 +2,11 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Home, 
+  CreditCard,
   Mic,
   Calendar,
-  RefreshCw
+  RefreshCw,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,9 +15,11 @@ export function BottomNav() {
   
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
+    { path: '/card', icon: CreditCard, label: 'Cartão' },
+    { path: '/ai', icon: Mic, label: 'ISA', isCenter: true },
     { path: '/agenda', icon: Calendar, label: 'Agenda' },
-    { path: '/ai', icon: Mic, label: 'AI Voice', isCenter: true },
     { path: '/rotinas', icon: RefreshCw, label: 'Rotinas' },
+    { path: '/goals', icon: User, label: 'Perfil' },
   ];
 
   return (
