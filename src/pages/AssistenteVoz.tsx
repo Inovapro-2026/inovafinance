@@ -525,8 +525,8 @@ export default function AssistenteVoz() {
           <p className="text-sm text-white/80">Sua Assistente de Rotinas</p>
         </div>
 
-        {/* Notification Permission Banner */}
-        {notificationPermission !== 'granted' && (
+        {/* Notification Permission Banner - Only show when not yet asked */}
+        {notificationPermission === 'default' && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
