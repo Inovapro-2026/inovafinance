@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // Google Gemini TTS API endpoint
-const GEMINI_TTS_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent";
+const GEMINI_TTS_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-native-audio-dialog:generateContent";
 
 // Convert raw PCM (L16) to WAV format
 function pcmToWav(pcmBase64: string, sampleRate: number = 24000, channels: number = 1, bitsPerSample: number = 16): string {
