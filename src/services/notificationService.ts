@@ -68,14 +68,65 @@ export function vibrateDevice(pattern: number | number[] = [200, 100, 200]): boo
   return false;
 }
 
+// Audio context for notification sounds
+let notificationAudioContext: AudioContext | null = null;
+
 /**
- * Send a local notification with optional vibration
+ * Play notification sound using Web Audio API
+ */
+export function playNotificationSound(): void {
+  try {
+    // Create or resume audio context
+    if (!notificationAudioContext) {
+      notificationAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    if (notificationAudioContext.state === 'suspended') {
+      notificationAudioContext.resume();
+    }
+
+    const ctx = notificationAudioContext;
+    const now = ctx.currentTime;
+
+    // Create a pleasant notification melody
+    const playTone = (frequency: number, startTime: number, duration: number, volume: number = 0.3) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+
+      // Envelope for smooth sound
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+
+    // Play a pleasant 3-tone notification chime
+    playTone(880, now, 0.15, 0.25);        // A5
+    playTone(1108.73, now + 0.12, 0.15, 0.25);  // C#6
+    playTone(1318.51, now + 0.24, 0.25, 0.3);   // E6
+
+  } catch (err) {
+    console.warn('Could not play notification sound:', err);
+  }
+}
+
+/**
+ * Send a local notification with optional vibration and sound
  */
 export function sendNotification(
   title: string, 
   body?: string,
   tag?: string,
-  vibrate: boolean = true
+  vibrate: boolean = true,
+  playSound: boolean = true
 ): Notification | null {
   if (!hasNotificationPermission()) {
     console.warn('Notification permission not granted');
@@ -88,13 +139,18 @@ export function sendNotification(
       vibrateDevice([200, 100, 200, 100, 300]);
     }
 
+    // Play notification sound
+    if (playSound) {
+      playNotificationSound();
+    }
+
     const notification = new Notification(title, {
       body,
       icon: '/apple-touch-icon.png',
       badge: '/apple-touch-icon.png',
       tag,
       requireInteraction: true,
-      silent: false,
+      silent: true, // We handle sound ourselves
     });
 
     notification.onclick = () => {
