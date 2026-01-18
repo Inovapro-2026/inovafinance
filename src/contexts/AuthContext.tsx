@@ -124,6 +124,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('inovabank_matricula');
+    // Clear audio flags so they play again on next login
+    sessionStorage.removeItem('login_audio_played');
+    sessionStorage.removeItem('intro_video_shown');
   };
 
   return (

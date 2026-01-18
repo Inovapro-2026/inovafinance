@@ -94,15 +94,25 @@ export default function Login() {
   const navigate = useNavigate();
   const { login, user } = useAuth();
 
-  // Play login audio on mount (only once, using exclusive audio)
-  // Only play if user is NOT already logged in
+  // Play login audio only once per session and only if user is NOT logged in
   const loginAudioPlayedRef = useRef(false);
   
   useEffect(() => {
     // Don't play audio if user is already logged in
-    if (user) return;
-    if (loginAudioPlayedRef.current) return;
+    if (user) {
+      console.log('Login audio skipped: user already logged in');
+      return;
+    }
+    
+    // Check if audio was already played this session
+    const alreadyPlayed = sessionStorage.getItem('login_audio_played');
+    if (alreadyPlayed || loginAudioPlayedRef.current) {
+      console.log('Login audio skipped: already played this session');
+      return;
+    }
+    
     loginAudioPlayedRef.current = true;
+    sessionStorage.setItem('login_audio_played', 'true');
     
     // Small delay to ensure intro audio has stopped
     const timer = setTimeout(() => {
