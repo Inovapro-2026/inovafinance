@@ -164,7 +164,7 @@ export default function Rotinas() {
   const loadRotinas = useCallback(async () => {
     if (!user) return;
     
-    const userMatricula = user.matricula || user.userId;
+    const userMatricula = user.userId;
     const rotinas = await getRotinas(userMatricula);
     setAllRotinas(rotinas);
     
@@ -251,7 +251,7 @@ export default function Rotinas() {
 
       console.log('Parsed command:', data);
 
-      const userMatricula = user.matricula || user.userId;
+      const userMatricula = user.userId;
       
       if (data.tipo === 'rotina') {
         // Add routine
@@ -298,7 +298,7 @@ export default function Rotinas() {
   const handleAddRotina = async (rotinaData: { titulo: string; dias_semana: string[]; hora: string }) => {
     if (!user) return;
     
-    const userMatricula = user.matricula || user.userId;
+    const userMatricula = user.userId;
     const rotina = await addRotina({
       user_matricula: userMatricula,
       ...rotinaData,
@@ -333,7 +333,7 @@ export default function Rotinas() {
   const handleComplete = async (rotinaId: string) => {
     if (!user) return;
     
-    const userMatricula = user.matricula || user.userId;
+    const userMatricula = user.userId;
     const isCompleted = isRotinaCompletedToday(rotinaId, completions);
     
     if (isCompleted) {

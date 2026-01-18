@@ -283,7 +283,7 @@ export default function Agenda() {
   const loadItems = useCallback(async () => {
     if (!user) return;
     
-    const userMatricula = user.matricula || user.userId;
+    const userMatricula = user.userId;
     const dateStr = selectedDate.toISOString().split('T')[0];
     const dayItems = await getAgendaItemsForDate(userMatricula, dateStr);
     setItems(dayItems);
@@ -376,7 +376,7 @@ export default function Agenda() {
 
       console.log('Parsed command:', data);
 
-      const userMatricula = user.matricula || user.userId;
+      const userMatricula = user.userId;
       
       if (data.tipo === 'consulta') {
         // Handle query commands
@@ -412,7 +412,7 @@ export default function Agenda() {
   const handleConsulta = async (tipo: 'hoje' | 'amanha' | 'semana') => {
     if (!user) return;
     
-    const userMatricula = user.matricula || user.userId;
+    const userMatricula = user.userId;
     let targetDate = new Date();
     if (tipo === 'amanha') {
       targetDate.setDate(targetDate.getDate() + 1);
@@ -456,7 +456,7 @@ export default function Agenda() {
   const handleAddItem = async (itemData: { titulo: string; data: string; hora: string; tipo: 'lembrete' | 'evento' }) => {
     if (!user) return;
     
-    const userMatricula = user.matricula || user.userId;
+    const userMatricula = user.userId;
     const item = await addAgendaItem({
       user_matricula: userMatricula,
       ...itemData,

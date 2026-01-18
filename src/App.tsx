@@ -18,6 +18,8 @@ import Transactions from "./pages/Transactions";
 import Goals from "./pages/Goals";
 import AI from "./pages/AI";
 import Planner from "./pages/Planner";
+import Agenda from "./pages/Agenda";
+import Rotinas from "./pages/Rotinas";
 import Statement from "./pages/Statement";
 import Affiliates from "./pages/Affiliates";
 import AffiliatePanel from "./pages/AffiliatePanel";
@@ -50,6 +52,8 @@ function AppRoutes() {
         <Route path="/goals" element={<Goals />} />
         <Route path="/ai" element={<AI />} />
         <Route path="/planner" element={<Planner />} />
+        <Route path="/agenda" element={<Agenda />} />
+        <Route path="/rotinas" element={<Rotinas />} />
         <Route path="/statement" element={<Statement />} />
         <Route path="/affiliates" element={<Affiliates />} />
         <Route path="/support" element={<Support />} />
