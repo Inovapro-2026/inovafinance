@@ -92,12 +92,15 @@ export default function Login() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   // Play login audio on mount (only once, using exclusive audio)
+  // Only play if user is NOT already logged in
   const loginAudioPlayedRef = useRef(false);
   
   useEffect(() => {
+    // Don't play audio if user is already logged in
+    if (user) return;
     if (loginAudioPlayedRef.current) return;
     loginAudioPlayedRef.current = true;
     
@@ -110,7 +113,7 @@ export default function Login() {
     return () => {
       clearTimeout(timer);
     };
-  }, []);
+  }, [user]);
   // Check biometric availability on mount
   useEffect(() => {
     const checkBiometric = async () => {
