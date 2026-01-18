@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { speak as speakTts, stopSpeaking } from '@/services/ttsService';
 import { addAgendaItem, formatTime, getTodayDate } from '@/lib/agendaDb';
 import { addRotina, DIAS_SEMANA_LABEL } from '@/lib/agendaDb';
-import { requestNotificationPermission, hasNotificationPermission, sendNotification } from '@/services/notificationService';
+import { requestNotificationPermission, hasNotificationPermission, sendNotification, getNotificationPermissionStatus } from '@/services/notificationService';
 import isaBackground from '@/assets/isa-background.jpg';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -117,24 +117,37 @@ export default function AssistenteVoz() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showAgendaModal, setShowAgendaModal] = useState(false);
   const [extractedTitle, setExtractedTitle] = useState('');
-  const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>('default');
+  const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>(
+    getNotificationPermissionStatus()
+  );
   const recognitionRef = useRef<any>(null);
 
-  // Check notification permission on mount
+  // Check notification permission on mount and focus
   useEffect(() => {
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-    }
+    const checkPermission = () => {
+      setNotificationPermission(getNotificationPermissionStatus());
+    };
+    checkPermission();
+    window.addEventListener('focus', checkPermission);
+    return () => window.removeEventListener('focus', checkPermission);
   }, []);
 
   // Request notification permission
   const handleRequestNotification = async () => {
-    const granted = await requestNotificationPermission();
-    if (granted) {
-      setNotificationPermission('granted');
-      toast.success('Notificações ativadas!');
-    } else {
-      setNotificationPermission('denied');
+    try {
+      const granted = await requestNotificationPermission();
+      // Re-check actual permission status after request
+      const actualStatus = getNotificationPermissionStatus();
+      setNotificationPermission(actualStatus);
+      
+      if (granted) {
+        toast.success('Notificações ativadas! 🔔');
+      } else {
+        toast.error('Permissão negada. Ative nas configurações do navegador.');
+      }
+    } catch (err) {
+      console.error('Error requesting notification permission:', err);
+      toast.error('Erro ao solicitar permissão');
     }
   };
 

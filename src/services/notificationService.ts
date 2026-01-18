@@ -45,12 +45,37 @@ export function hasNotificationPermission(): boolean {
 }
 
 /**
- * Send a local notification
+ * Get current notification permission status
+ */
+export function getNotificationPermissionStatus(): 'granted' | 'denied' | 'default' {
+  if (!isNotificationSupported()) return 'denied';
+  return Notification.permission;
+}
+
+/**
+ * Vibrate the device if supported
+ */
+export function vibrateDevice(pattern: number | number[] = [200, 100, 200]): boolean {
+  if ('vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+      return true;
+    } catch (err) {
+      console.warn('Vibration failed:', err);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Send a local notification with optional vibration
  */
 export function sendNotification(
   title: string, 
   body?: string,
-  tag?: string
+  tag?: string,
+  vibrate: boolean = true
 ): Notification | null {
   if (!hasNotificationPermission()) {
     console.warn('Notification permission not granted');
@@ -58,12 +83,18 @@ export function sendNotification(
   }
 
   try {
+    // Vibrate device when notification is sent
+    if (vibrate) {
+      vibrateDevice([200, 100, 200, 100, 300]);
+    }
+
     const notification = new Notification(title, {
       body,
-      icon: '/icon-192.png',
-      badge: '/favicon.png',
+      icon: '/apple-touch-icon.png',
+      badge: '/apple-touch-icon.png',
       tag,
       requireInteraction: true,
+      silent: false,
     });
 
     notification.onclick = () => {
@@ -76,6 +107,18 @@ export function sendNotification(
     console.error('Error sending notification:', err);
     return null;
   }
+}
+
+/**
+ * Send a test notification
+ */
+export function sendTestNotification(): Notification | null {
+  return sendNotification(
+    '🔔 Teste de Notificação',
+    'As notificações estão funcionando corretamente!',
+    'test-notification',
+    true
+  );
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Target, Trophy, Calendar, X, User, Mail, Phone, CreditCard, Wallet, Lock, Edit3, Check, Hash, DollarSign, CalendarDays, LogOut, MessageCircle, Receipt, Banknote, Crown, FileText } from 'lucide-react';
+import { Plus, Target, Trophy, Calendar, X, User, Mail, Phone, CreditCard, Wallet, Lock, Edit3, Check, Hash, DollarSign, CalendarDays, LogOut, MessageCircle, Receipt, Banknote, Crown, FileText, Bell, BellRing } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { updateUserSalaryInfo, getUserSalaryInfo } from '@/lib/plannerDb';
 import { toast } from 'sonner';
 import { useIsaGreeting } from '@/hooks/useIsaGreeting';
 import { SupportModal } from '@/components/SupportModal';
+import { hasNotificationPermission, requestNotificationPermission, sendTestNotification, getNotificationPermissionStatus } from '@/services/notificationService';
 
 export default function Goals() {
   const { user, refreshUser, logout } = useAuth();
@@ -629,6 +630,57 @@ export default function Goals() {
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>
+              )}
+            </div>
+          </GlassCard>
+
+          {/* Notificações */}
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                <BellRing className="w-6 h-6 text-orange-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground mb-1">Notificações</p>
+                <p className="font-semibold text-sm">
+                  {getNotificationPermissionStatus() === 'granted' ? 'Ativadas ✓' : 
+                   getNotificationPermissionStatus() === 'denied' ? 'Bloqueadas' : 'Não configuradas'}
+                </p>
+              </div>
+              {getNotificationPermissionStatus() === 'granted' ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const notification = sendTestNotification();
+                    if (notification) {
+                      toast.success('Notificação de teste enviada!');
+                    } else {
+                      toast.error('Erro ao enviar notificação');
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  <Bell className="w-4 h-4 mr-1" />
+                  Testar
+                </Button>
+              ) : getNotificationPermissionStatus() === 'default' ? (
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    const granted = await requestNotificationPermission();
+                    if (granted) {
+                      toast.success('Notificações ativadas!');
+                    } else {
+                      toast.error('Permissão negada');
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  Ativar
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground">Desbloqueie no navegador</span>
               )}
             </div>
           </GlassCard>
