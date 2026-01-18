@@ -10,7 +10,7 @@ import { getScheduledPayments, getUserSalaryInfo, calculateMonthlySummary } from
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { speakWithElevenLabs, stopElevenLabsSpeaking, isElevenLabsSpeaking } from '@/services/elevenlabsTtsService';
+import { speak as speakTts, stopSpeaking as stopTtsSpeaking, isSpeaking as isTtsSpeaking } from '@/services/ttsService';
 import { SchedulePaymentModal } from '@/components/SchedulePaymentModal';
 import { addScheduledPayment } from '@/lib/plannerDb';
 import { ExpenseAnimation } from '@/components/animations/ExpenseAnimation';
@@ -248,28 +248,22 @@ export default function AI() {
     };
   }, []);
 
-  // Initialize ElevenLabs TTS
+  // Initialize TTS
   useEffect(() => {
     setVoiceReady(true);
 
     return () => {
-      stopElevenLabsSpeaking();
+      stopTtsSpeaking();
     };
   }, []);
 
-  // TTS function using ElevenLabs voice with exclusive control
+  // TTS function using InovaFinance TTS with exclusive control
   const speak = useCallback(async (text: string) => {
     if (!voiceEnabled) return;
 
     try {
       setIsSpeaking(true);
-
-      // Stop any current audio before starting new speech
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-
-      await speakWithElevenLabs(text);
+      await speakTts(text);
       setIsSpeaking(false);
     } catch (err) {
       console.error('TTS error:', err);
@@ -278,7 +272,7 @@ export default function AI() {
   }, [voiceEnabled]);
 
   const handleStopSpeaking = useCallback(() => {
-    stopElevenLabsSpeaking();
+    stopTtsSpeaking();
     setIsSpeaking(false);
   }, []);
 

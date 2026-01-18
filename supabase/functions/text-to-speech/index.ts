@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
+import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -84,9 +84,24 @@ serve(async (req) => {
 
     console.log('TTS Success - audio URL:', data.audio_url);
 
-    // Return the audio URL for the client to play directly
+    // IMPORTANT: The app runs on HTTPS; returning an HTTP audio_url would be blocked as mixed content.
+    // So we proxy the audio bytes through this Edge Function and return base64.
+    const audioRes = await fetch(data.audio_url);
+    if (!audioRes.ok) {
+      const audioErr = await audioRes.text();
+      console.error('Failed to fetch generated audio:', audioRes.status, audioErr);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch generated audio file', details: audioErr }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const contentType = audioRes.headers.get('content-type') || 'audio/wav';
+    const audioBytes = new Uint8Array(await audioRes.arrayBuffer());
+    const audioBase64 = encodeBase64(audioBytes.buffer);
+
     return new Response(
-      JSON.stringify({ audio_url: data.audio_url }),
+      JSON.stringify({ audio: audioBase64, contentType, audio_url: data.audio_url }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
