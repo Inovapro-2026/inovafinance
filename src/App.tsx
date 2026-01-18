@@ -63,11 +63,35 @@ function AppRoutes() {
 }
 
 function AppContent() {
-  const [showVideo, setShowVideo] = useState(true);
+  const { user, isLoading } = useAuth();
+  const [showVideo, setShowVideo] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Only show video if user is NOT logged in
+    // Wait for auth loading to complete before deciding
+    if (!isLoading) {
+      if (user) {
+        // User is logged in, skip video
+        setShowVideo(false);
+      } else {
+        // User is not logged in, show video
+        setShowVideo(true);
+      }
+    }
+  }, [user, isLoading]);
 
   const handleVideoComplete = () => {
     setShowVideo(false);
   };
+
+  // Show nothing while loading auth state
+  if (isLoading || showVideo === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (showVideo) {
     return <VideoSplash onComplete={handleVideoComplete} />;
