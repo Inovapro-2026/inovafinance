@@ -33,9 +33,8 @@ const DIAS_SEMANA = [
   { value: 'sab', label: 'S' },
 ];
 
-const HORARIOS = Array.from({ length: 24 }, (_, h) => 
-  ['00', '30'].map(m => `${String(h).padStart(2, '0')}:${m}`)
-).flat();
+const HORAS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
+const MINUTOS = Array.from({ length: 60 }, (_, m) => String(m).padStart(2, '0'));
 
 export function AgendaFormModal({ isOpen, onClose, onSubmit, initialTitle = '' }: AgendaFormModalProps) {
   const [titulo, setTitulo] = useState(initialTitle);
@@ -247,7 +246,7 @@ export function AgendaFormModal({ isOpen, onClose, onSubmit, initialTitle = '' }
                   className="w-full h-12 px-4 flex items-center gap-3 bg-muted/50 border border-border rounded-xl hover:bg-muted transition-colors"
                 >
                   <Clock className="w-5 h-5 text-primary" />
-                  <span className="flex-1 text-left">{hora}</span>
+                  <span className="flex-1 text-left text-lg font-medium">{hora}</span>
                 </button>
 
                 <AnimatePresence>
@@ -258,26 +257,64 @@ export function AgendaFormModal({ isOpen, onClose, onSubmit, initialTitle = '' }
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="bg-card rounded-xl border border-border p-2 mt-2 max-h-48 overflow-y-auto">
-                        <div className="grid grid-cols-4 gap-1">
-                          {HORARIOS.map((h) => (
-                            <button
-                              key={h}
-                              onClick={() => {
-                                setHora(h);
-                                setShowTimePicker(false);
-                              }}
-                              className={cn(
-                                "py-2 px-2 rounded-lg text-sm transition-all",
-                                hora === h
-                                  ? "bg-primary text-primary-foreground"
-                                  : "hover:bg-muted"
-                              )}
-                            >
-                              {h}
-                            </button>
-                          ))}
+                      <div className="bg-card rounded-xl border border-border p-4 mt-2">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Seletor de Hora */}
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs text-muted-foreground mb-2">Hora</span>
+                            <div className="h-48 overflow-y-auto scrollbar-thin bg-muted/30 rounded-xl p-1">
+                              <div className="flex flex-col gap-1">
+                                {HORAS.map((h) => (
+                                  <button
+                                    key={h}
+                                    onClick={() => setHora(`${h}:${hora.split(':')[1]}`)}
+                                    className={cn(
+                                      "w-14 py-2 rounded-lg text-lg font-medium transition-all",
+                                      hora.split(':')[0] === h
+                                        ? "bg-primary text-primary-foreground shadow-md"
+                                        : "hover:bg-muted text-foreground"
+                                    )}
+                                  >
+                                    {h}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className="text-3xl font-bold text-primary">:</span>
+
+                          {/* Seletor de Minuto */}
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs text-muted-foreground mb-2">Min</span>
+                            <div className="h-48 overflow-y-auto scrollbar-thin bg-muted/30 rounded-xl p-1">
+                              <div className="flex flex-col gap-1">
+                                {MINUTOS.map((m) => (
+                                  <button
+                                    key={m}
+                                    onClick={() => setHora(`${hora.split(':')[0]}:${m}`)}
+                                    className={cn(
+                                      "w-14 py-2 rounded-lg text-lg font-medium transition-all",
+                                      hora.split(':')[1] === m
+                                        ? "bg-primary text-primary-foreground shadow-md"
+                                        : "hover:bg-muted text-foreground"
+                                    )}
+                                  >
+                                    {m}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
+
+                        <Button
+                          onClick={() => setShowTimePicker(false)}
+                          className="w-full mt-4"
+                          size="sm"
+                        >
+                          Confirmar
+                        </Button>
                       </div>
                     </motion.div>
                   )}
