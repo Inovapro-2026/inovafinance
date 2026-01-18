@@ -255,7 +255,7 @@ export async function getTodaysDuePayments(userId: number): Promise<ScheduledPay
   });
 }
 
-// Calculate monthly summary
+// Calculate monthly summary (only unpaid payments)
 export async function calculateMonthlySummary(userId: number, salaryAmount: number, salaryDay: number, advanceAmount: number = 0): Promise<{
   totalPayments: number;
   paymentsList: ScheduledPayment[];
@@ -269,6 +269,12 @@ export async function calculateMonthlySummary(userId: number, salaryAmount: numb
   
   // Filter active payments for this month
   const monthlyPayments = payments.filter(p => {
+    // Check if already paid this month - if so, don't include
+    if (p.lastPaidAt) {
+      const lastPaidMonth = p.lastPaidAt.toISOString().slice(0, 7);
+      if (lastPaidMonth === currentMonth) return false;
+    }
+    
     if (p.isRecurring) return true;
     if (p.specificMonth) {
       const paymentMonth = p.specificMonth.toISOString().slice(0, 7);
@@ -283,7 +289,7 @@ export async function calculateMonthlySummary(userId: number, salaryAmount: numb
   const totalIncome = salaryAmount + advanceAmount;
   const projectedBalance = totalIncome - totalPayments;
   
-  // Find heaviest payment
+  // Find heaviest payment among unpaid
   const heaviestPayment = monthlyPayments.length > 0 
     ? monthlyPayments.reduce((max, p) => p.amount > max.amount ? p : max, monthlyPayments[0])
     : null;
@@ -302,6 +308,19 @@ export async function calculateMonthlySummary(userId: number, salaryAmount: numb
     heaviestPayment,
     paymentsByDay,
   };
+}
+
+// Get days until a payment is due (negative if overdue)
+export function getDaysUntilDue(dueDay: number): number {
+  const today = new Date();
+  const currentDay = today.getDate();
+  
+  if (dueDay === currentDay) return 0;
+  if (dueDay > currentDay) return dueDay - currentDay;
+  
+  // Payment day has passed this month
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  return dueDay - currentDay; // Returns negative for overdue
 }
 
 // Get user salary info

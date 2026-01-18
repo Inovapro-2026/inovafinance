@@ -41,6 +41,7 @@ import {
   checkAdvanceCredited,
   calculateDaysUntil,
   getUnpaidPaymentsThisMonth,
+  getDaysUntilDue,
   type ScheduledPayment 
 } from '@/lib/plannerDb';
 import { addTransaction, calculateBalance, getGoals } from '@/lib/db';
@@ -674,35 +675,65 @@ export default function Planner() {
           </GlassCard>
         ) : (
           <div className="space-y-2">
-            {recurringPayments.map((payment) => (
-              <GlassCard 
-                key={payment.id} 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]"
-                onClick={() => setSelectedPayment(payment)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{CATEGORY_ICONS[payment.category] || '📋'}</span>
-                    <div>
-                      <p className="font-medium">{payment.name}</p>
-                      <p className="text-xs text-muted-foreground">Todo dia {payment.dueDay}</p>
+            {recurringPayments.map((payment) => {
+              const daysUntil = getDaysUntilDue(payment.dueDay);
+              const isOverdue = daysUntil < 0;
+              const isDueSoon = daysUntil >= 0 && daysUntil <= 3;
+              const isToday = daysUntil === 0;
+              
+              return (
+                <GlassCard 
+                  key={payment.id} 
+                  className={cn(
+                    "p-4 cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]",
+                    isOverdue && "border-2 border-red-500/50 bg-red-500/5",
+                    isDueSoon && !isOverdue && "border-2 border-yellow-500/50 bg-yellow-500/5"
+                  )}
+                  onClick={() => setSelectedPayment(payment)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <span className="text-2xl">{CATEGORY_ICONS[payment.category] || '📋'}</span>
+                        {(isDueSoon || isOverdue) && (
+                          <span className={cn(
+                            "absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse",
+                            isOverdue ? "bg-red-500" : "bg-yellow-500"
+                          )} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{payment.name}</p>
+                          {isToday && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-yellow-500 text-yellow-950">HOJE</span>
+                          )}
+                          {isOverdue && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500 text-white">ATRASADO</span>
+                          )}
+                          {isDueSoon && !isToday && !isOverdue && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-yellow-500/80 text-yellow-950">{daysUntil}d</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Todo dia {payment.dueDay}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-destructive">{formatCurrency(payment.amount)}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          payment.id && handleDeletePayment(payment.id);
+                        }}
+                        className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-destructive">{formatCurrency(payment.amount)}</p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        payment.id && handleDeletePayment(payment.id);
-                      }}
-                      className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </GlassCard>
-            ))}
+                </GlassCard>
+              );
+            })}
           </div>
         )}
       </div>
@@ -723,37 +754,67 @@ export default function Planner() {
           </GlassCard>
         ) : (
           <div className="space-y-2">
-            {oneTimePayments.map((payment) => (
-              <GlassCard 
-                key={payment.id} 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]"
-                onClick={() => setSelectedPayment(payment)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{CATEGORY_ICONS[payment.category] || '📋'}</span>
-                    <div>
-                      <p className="font-medium">{payment.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {payment.specificMonth ? format(payment.specificMonth, "dd/MM/yyyy", { locale: ptBR }) : `Dia ${payment.dueDay}`}
-                      </p>
+            {oneTimePayments.map((payment) => {
+              const daysUntil = getDaysUntilDue(payment.dueDay);
+              const isOverdue = daysUntil < 0;
+              const isDueSoon = daysUntil >= 0 && daysUntil <= 3;
+              const isToday = daysUntil === 0;
+              
+              return (
+                <GlassCard 
+                  key={payment.id} 
+                  className={cn(
+                    "p-4 cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]",
+                    isOverdue && "border-2 border-red-500/50 bg-red-500/5",
+                    isDueSoon && !isOverdue && "border-2 border-yellow-500/50 bg-yellow-500/5"
+                  )}
+                  onClick={() => setSelectedPayment(payment)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <span className="text-2xl">{CATEGORY_ICONS[payment.category] || '📋'}</span>
+                        {(isDueSoon || isOverdue) && (
+                          <span className={cn(
+                            "absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse",
+                            isOverdue ? "bg-red-500" : "bg-yellow-500"
+                          )} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{payment.name}</p>
+                          {isToday && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-yellow-500 text-yellow-950">HOJE</span>
+                          )}
+                          {isOverdue && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500 text-white">ATRASADO</span>
+                          )}
+                          {isDueSoon && !isToday && !isOverdue && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-yellow-500/80 text-yellow-950">{daysUntil}d</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {payment.specificMonth ? format(payment.specificMonth, "dd/MM/yyyy", { locale: ptBR }) : `Dia ${payment.dueDay}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-destructive">{formatCurrency(payment.amount)}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          payment.id && handleDeletePayment(payment.id);
+                        }}
+                        className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-destructive">{formatCurrency(payment.amount)}</p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        payment.id && handleDeletePayment(payment.id);
-                      }}
-                      className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </GlassCard>
-            ))}
+                </GlassCard>
+              );
+            })}
           </div>
         )}
       </div>
