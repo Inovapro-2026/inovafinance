@@ -119,27 +119,46 @@ function parseDaysFromText(text: string): string[] {
   return days;
 }
 
+// Get current date in Brazil timezone (UTC-3)
+function getBrazilDate(): Date {
+  const now = new Date();
+  // Brazil is UTC-3
+  const brazilOffset = -3 * 60; // -180 minutes
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utcTime + (brazilOffset * 60000));
+}
+
+function formatDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function parseDateFromText(text: string): string | null {
   const normalized = normalizeText(text);
-  const today = new Date();
+  const today = getBrazilDate();
+
+  console.log('Brazil date/time:', today.toISOString(), 'formatted:', formatDateString(today));
 
   // "hoje"
   if (/\bhoje\b/.test(normalized)) {
-    return today.toISOString().split('T')[0];
+    return formatDateString(today);
   }
 
   // "amanha"
   if (/\bamanha\b/.test(normalized)) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    console.log('Tomorrow calculated as:', formatDateString(tomorrow));
+    return formatDateString(tomorrow);
   }
 
   // "depois de amanha"
   if (/depois\s*de\s*amanha/.test(normalized)) {
     const dayAfter = new Date(today);
     dayAfter.setDate(dayAfter.getDate() + 2);
-    return dayAfter.toISOString().split('T')[0];
+    return formatDateString(dayAfter);
   }
 
   // Day of month pattern: "dia 15", "no dia 20"
@@ -152,7 +171,7 @@ function parseDateFromText(text: string): string | null {
       if (date < today) {
         date.setMonth(date.getMonth() + 1);
       }
-      return date.toISOString().split('T')[0];
+      return formatDateString(date);
     }
   }
 
