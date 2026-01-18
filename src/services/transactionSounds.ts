@@ -1,4 +1,6 @@
 // Transaction sound effects using Web Audio API
+import { stopAllAudio } from '@/services/audioManager';
+
 class TransactionSoundService {
   private audioContext: AudioContext | null = null;
 
@@ -12,6 +14,9 @@ class TransactionSoundService {
   // Payment beep sound for expenses
   playExpenseSound(): void {
     try {
+      // Stop any other audio first
+      stopAllAudio();
+      
       const ctx = this.getAudioContext();
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
@@ -52,6 +57,9 @@ class TransactionSoundService {
   // Cash/coin sound for income
   playIncomeSound(): void {
     try {
+      // Stop any other audio first
+      stopAllAudio();
+      
       const ctx = this.getAudioContext();
 
       // Multiple tones to simulate coins/cash

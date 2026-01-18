@@ -15,6 +15,7 @@ import {
   authenticateWithBiometric,
   getBiometricMatricula
 } from '@/services/biometricService';
+import { playAudioExclusively } from '@/services/audioManager';
 import loginAudio from '@/assets/login-audio.mp3';
 
 type Step = 'matricula' | 'register' | 'success' | 'pending' | 'rejected';
@@ -93,7 +94,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  // Play login audio on mount (only once)
+  // Play login audio on mount (only once, using exclusive audio)
   const loginAudioPlayedRef = useRef(false);
   
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function Login() {
     // Small delay to ensure intro audio has stopped
     const timer = setTimeout(() => {
       const audio = new Audio(loginAudio);
-      audio.play().catch((err) => console.error('Error playing login audio:', err));
+      playAudioExclusively(audio).catch((err) => console.error('Error playing login audio:', err));
     }, 500);
     
     return () => {
