@@ -12,6 +12,7 @@ import { requestNotificationPermission, hasNotificationPermission, sendNotificat
 import isaBackground from '@/assets/isa-background.jpg';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { AgendaFormModal, AgendaFormData } from '@/components/AgendaFormModal';
 
 // Sugestões rotativas para agenda/rotinas
 const SUGGESTIONS = [
@@ -114,6 +115,8 @@ export default function AssistenteVoz() {
   const [statusText, setStatusText] = useState('Toque para falar');
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showAgendaModal, setShowAgendaModal] = useState(false);
+  const [extractedTitle, setExtractedTitle] = useState('');
   const recognitionRef = useRef<any>(null);
 
   // Request notification permission
@@ -183,7 +186,41 @@ export default function AssistenteVoz() {
     }
   };
 
-  // Process command - AUTOMATIC flow
+  // Extract title from command text
+  const extractTitleFromCommand = (text: string): string => {
+    const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    // Remove common prefixes
+    let title = normalized
+      .replace(/^(me lembre de|me lembra de|lembre-me de|lembra-me de|lembrar de|lembrar|me avise para|me avisa para|avise-me para|avisa-me para|agendar|agenda|criar rotina para|criar rotina de|adicionar rotina para|adicionar rotina de|adicionar|criar lembrete para|criar lembrete de|marcar|marque)\s*/i, '')
+      .trim();
+    
+    // Remove time references
+    title = title
+      .replace(/\s*(as|às|a|para)\s+\d{1,2}(:\d{2})?\s*(h|horas?)?/gi, '')
+      .replace(/\s*(amanha|hoje|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo)/gi, '')
+      .replace(/\s*(dia\s+)?\d{1,2}(\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro))?/gi, '')
+      .replace(/\s*(todo dia|todos os dias|segunda a sexta|seg a sex)/gi, '')
+      .trim();
+    
+    // Capitalize first letter
+    return title.charAt(0).toUpperCase() + title.slice(1);
+  };
+
+  // Check if command is an agenda-related command
+  const isAgendaCommand = (text: string): boolean => {
+    const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const agendaKeywords = [
+      'me lembre', 'me lembra', 'lembre-me', 'lembra-me', 'lembrar',
+      'me avise', 'me avisa', 'avise-me', 'avisa-me',
+      'agendar', 'agenda', 'marcar', 'marque',
+      'criar rotina', 'adicionar rotina', 'criar lembrete',
+      'rotina de', 'rotina para'
+    ];
+    return agendaKeywords.some(keyword => normalized.includes(keyword));
+  };
+
+  // Process command - opens modal for user to confirm details
   const processCommand = async (command: string) => {
     if (!user || !command.trim()) return;
 
@@ -206,77 +243,39 @@ export default function AssistenteVoz() {
         return;
       }
 
-      // Call edge function to parse the command (send client time to avoid timezone drift)
-      const now = new Date();
-      const { data, error } = await supabase.functions.invoke('parse-agenda-command', {
-        body: {
-          message: command,
-          client_now_iso: now.toISOString(),
-          client_tz_offset_minutes: now.getTimezoneOffset(),
+      // Check if it's an agenda/reminder command
+      if (isAgendaCommand(command)) {
+        // Extract title and open modal
+        const title = extractTitleFromCommand(command);
+        setExtractedTitle(title);
+        setShowAgendaModal(true);
+        
+        if (voiceEnabled) {
+          speakTts('Ok, complete os detalhes no formulário.');
         }
-      });
+        setStatusText('Toque para falar');
+        setIsProcessing(false);
+        return;
+      }
 
-      if (error) throw error;
+      // Check for query commands
+      const queryKeywords = ['o que tenho', 'quais compromissos', 'minha agenda', 'meus lembretes', 'compromissos de'];
+      const isQueryCommand = queryKeywords.some(keyword => normalizedCommand.includes(keyword));
 
-      console.log('Parsed command:', data);
-
-      const userMatricula = user.userId;
-
-      if (data.tipo === 'consulta') {
-        // Handle query
-        await handleConsulta(data.consulta_tipo);
-      } else if (data.tipo === 'rotina') {
-        // Create rotina AUTOMATICALLY
-        const rotina = await addRotina({
-          user_matricula: userMatricula,
-          titulo: data.titulo,
-          dias_semana: data.dias_semana,
-          hora: data.hora,
-        });
-
-        if (rotina) {
-          const diasLabel = data.dias_semana.length === 7
-            ? 'todos os dias'
-            : data.dias_semana.length === 5
-              ? 'segunda a sexta'
-              : data.dias_semana.map((d: string) => DIAS_SEMANA_LABEL[d] || d).join(', ');
-
-          const confirmation = `✅ Rotina criada: ${data.titulo}, ${diasLabel} às ${formatTime(data.hora)}.`;
-          
-          setConfirmationMessage(confirmation);
-          setShowConfirmation(true);
-          
-          if (voiceEnabled) {
-            speakTts(`Rotina adicionada: ${data.titulo}, ${diasLabel} às ${formatTime(data.hora)}.`);
-          }
-
-          // Schedule notification
-          scheduleRotinaNotification(data.titulo, data.hora, data.dias_semana);
+      if (isQueryCommand) {
+        // Determine query type
+        let queryType: 'hoje' | 'amanha' | 'semana' = 'hoje';
+        if (normalizedCommand.includes('amanha')) {
+          queryType = 'amanha';
+        } else if (normalizedCommand.includes('semana')) {
+          queryType = 'semana';
         }
-      } else if (data.tipo === 'lembrete') {
-        // Create agenda item AUTOMATICALLY
-        const item = await addAgendaItem({
-          user_matricula: userMatricula,
-          titulo: data.titulo,
-          data: data.data,
-          hora: data.hora,
-          tipo: 'lembrete',
-        });
-
-        if (item) {
-          const dateLabel = getDateLabel(data.data);
-          const confirmation = `✅ Lembrete agendado para ${dateLabel} às ${formatTime(data.hora)}.`;
-          
-          setConfirmationMessage(confirmation);
-          setShowConfirmation(true);
-          
-          if (voiceEnabled) {
-            speakTts(`Lembrete salvo: ${data.titulo}, ${dateLabel} às ${formatTime(data.hora)}.`);
-          }
-
-          // Schedule notification
-          scheduleAgendaNotification(item.id, data.titulo, data.data, data.hora);
-        }
+        await handleConsulta(queryType);
+      } else {
+        // Unknown command - suggest what the assistant can do
+        const msg = "Diga 'me lembre de...' ou 'agendar...' para criar lembretes e rotinas.";
+        if (voiceEnabled) speakTts(msg);
+        toast.info(msg);
       }
     } catch (err) {
       console.error('Error processing command:', err);
@@ -284,6 +283,68 @@ export default function AssistenteVoz() {
     } finally {
       setIsProcessing(false);
       setStatusText('Toque para falar');
+    }
+  };
+
+  // Handle form submission from modal
+  const handleAgendaFormSubmit = async (formData: AgendaFormData) => {
+    if (!user) return;
+
+    const userMatricula = user.userId;
+
+    try {
+      if (formData.tipo === 'rotina') {
+        const rotina = await addRotina({
+          user_matricula: userMatricula,
+          titulo: formData.titulo,
+          dias_semana: formData.dias_semana,
+          hora: formData.hora,
+        });
+
+        if (rotina) {
+          const diasLabel = formData.dias_semana.length === 7
+            ? 'todos os dias'
+            : formData.dias_semana.length === 5
+              ? 'segunda a sexta'
+              : formData.dias_semana.map((d: string) => DIAS_SEMANA_LABEL[d] || d).join(', ');
+
+          const confirmation = `✅ Rotina criada: ${formData.titulo}, ${diasLabel} às ${formatTime(formData.hora)}.`;
+          
+          setConfirmationMessage(confirmation);
+          setShowConfirmation(true);
+          
+          if (voiceEnabled) {
+            speakTts(`Rotina adicionada: ${formData.titulo}, ${diasLabel} às ${formatTime(formData.hora)}.`);
+          }
+
+          scheduleRotinaNotification(formData.titulo, formData.hora, formData.dias_semana);
+        }
+      } else {
+        const item = await addAgendaItem({
+          user_matricula: userMatricula,
+          titulo: formData.titulo,
+          data: formData.data,
+          hora: formData.hora,
+          tipo: 'lembrete',
+        });
+
+        if (item) {
+          const dateLabel = getDateLabel(formData.data);
+          const confirmation = `✅ Lembrete agendado para ${dateLabel} às ${formatTime(formData.hora)}.`;
+          
+          setConfirmationMessage(confirmation);
+          setShowConfirmation(true);
+          
+          if (voiceEnabled) {
+            speakTts(`Lembrete salvo: ${formData.titulo}, ${dateLabel} às ${formatTime(formData.hora)}.`);
+          }
+
+          scheduleAgendaNotification(item.id, formData.titulo, formData.data, formData.hora);
+        }
+      }
+    } catch (err) {
+      console.error('Error saving agenda item:', err);
+      toast.error('Erro ao salvar');
     }
   };
 
@@ -534,6 +595,14 @@ export default function AssistenteVoz() {
         message={confirmationMessage}
         isVisible={showConfirmation}
         onClose={() => setShowConfirmation(false)}
+      />
+
+      {/* Agenda Form Modal */}
+      <AgendaFormModal
+        isOpen={showAgendaModal}
+        onClose={() => setShowAgendaModal(false)}
+        onSubmit={handleAgendaFormSubmit}
+        initialTitle={extractedTitle}
       />
     </div>
   );
