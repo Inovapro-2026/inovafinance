@@ -296,7 +296,15 @@ export default function AI() {
       recentTransactions: []
     };
 
-    const { balance, debitBalance, totalIncome, totalExpense, creditUsed } = await calculateBalance(user.userId, user.initialBalance);
+    const { balance, totalIncome, totalExpense, creditUsed } = await calculateBalance(
+      user.userId,
+      user.initialBalance
+    );
+
+    // IMPORTANT: keep debitBalance aligned with the UI "Saldo Débito" (saldo inicial da conta)
+    // so that what the assistant says matches what the user sees.
+    const debitBalance = user.initialBalance || 0;
+
     const transactions = await getTransactions(user.userId);
     const recentTransactions = transactions.slice(0, 10).map((t) => ({
       amount: t.amount,
