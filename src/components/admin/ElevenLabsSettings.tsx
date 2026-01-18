@@ -203,11 +203,12 @@ export function ElevenLabsSettings() {
         setSavedKey(apiKey);
         setUsage(data.usage);
 
-        // Play test audio if available
+        // Play test audio if available using exclusive audio manager
         if (data.audio) {
+          const { playAudioExclusively } = await import('@/services/audioManager');
           const audioUrl = `data:audio/mpeg;base64,${data.audio}`;
           const audio = new Audio(audioUrl);
-          audio.play().catch(e => console.error("Audio play error:", e));
+          playAudioExclusively(audio).catch(e => console.error("Audio play error:", e));
         }
 
         toast({

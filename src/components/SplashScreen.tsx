@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield } from 'lucide-react';
+import { stopAllAudio, speakTextExclusively } from '@/services/audioManager';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -15,7 +16,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     const textTimer = setTimeout(() => setShowText(true), 800);
     const subtextTimer = setTimeout(() => setShowSubtext(true), 1600);
 
-    // Play welcome audio
+    // Play welcome audio using exclusive audio manager
     const audioTimer = setTimeout(() => {
       playWelcomeAudio();
     }, 1200);
@@ -30,57 +31,20 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       clearTimeout(subtextTimer);
       clearTimeout(audioTimer);
       clearTimeout(completeTimer);
+      stopAllAudio();
     };
   }, [onComplete]);
 
   const playWelcomeAudio = () => {
-    if ('speechSynthesis' in window) {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
-
-      const welcomeText = 'Bem-vindo ao INOVAFINANCE! Seu assistente financeiro inteligente.';
-      const utterance = new SpeechSynthesisUtterance(welcomeText);
-      utterance.lang = 'pt-BR';
-      utterance.rate = 0.85;
-      utterance.pitch = 1.05;
-      utterance.volume = 1;
-
-      const selectVoice = (voices: SpeechSynthesisVoice[]) => {
-        // Prioritize Microsoft/Google Brazilian voices
-        const preferredVoices = [
-          'Microsoft Daniel',
-          'Google português do Brasil',
-          'Daniel',
-          'Luciana',
-        ];
-
-        for (const preferred of preferredVoices) {
-          const voice = voices.find(v =>
-            v.name.includes(preferred) && (v.lang === 'pt-BR' || v.lang.startsWith('pt'))
-          );
-          if (voice) return voice;
-        }
-
-        // Fallback to any pt-BR voice
-        return voices.find(v => v.lang === 'pt-BR' || v.lang.startsWith('pt'));
-      };
-
-      const voices = window.speechSynthesis.getVoices();
-
-      if (voices.length > 0) {
-        const voice = selectVoice(voices);
-        if (voice) utterance.voice = voice;
-        window.speechSynthesis.speak(utterance);
-      } else {
-        // Wait for voices to load
-        window.speechSynthesis.onvoiceschanged = () => {
-          const loadedVoices = window.speechSynthesis.getVoices();
-          const voice = selectVoice(loadedVoices);
-          if (voice) utterance.voice = voice;
-          window.speechSynthesis.speak(utterance);
-        };
-      }
-    }
+    const welcomeText = 'Bem-vindo ao INOVAFINANCE! Seu assistente financeiro inteligente.';
+    
+    // Use exclusive audio manager for speech
+    speakTextExclusively(welcomeText, {
+      lang: 'pt-BR',
+      rate: 0.85,
+      pitch: 1.05,
+      volume: 1
+    });
   };
 
   return (
