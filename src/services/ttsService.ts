@@ -4,6 +4,9 @@ import { playAudioExclusively, stopAllAudio, isGlobalAudioPlaying, speakTextExcl
 // Cache for audio to avoid repeated API calls
 const audioCache = new Map<string, string>();
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
 export interface TTSResult {
   audio: HTMLAudioElement | null;
   error: string | null;
@@ -27,7 +30,7 @@ async function playAudioOrFallback(audio: HTMLAudioElement, fallbackText: string
 }
 
 /**
- * Text-to-Speech service using InovaFinance TTS API via Edge Function
+ * Text-to-Speech service using ElevenLabs TTS API via Edge Function
  * Converts text to audio and plays it
  */
 export async function speak(text: string): Promise<HTMLAudioElement | null> {
@@ -49,45 +52,51 @@ export async function speak(text: string): Promise<HTMLAudioElement | null> {
   }
 
   try {
-    console.log('TTS: Requesting speech for:', text.substring(0, 50));
+    console.log('TTS: Requesting speech from ElevenLabs for:', text.substring(0, 50));
 
-    const { data, error } = await supabase.functions.invoke('text-to-speech', {
-      body: { text: text.trim() },
+    // Use ElevenLabs TTS instead of Gemini (which has quota limits)
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ text: text.trim() }),
     });
 
-    if (error) {
-      console.error('TTS: Edge function error:', error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('TTS: ElevenLabs error:', errorText);
+      // Fallback to native TTS
+      console.log('TTS: Falling back to native speech synthesis');
+      speakTextExclusively(text, { lang: 'pt-BR' });
       return null;
     }
 
-    if (data?.error) {
-      console.error('TTS: API error:', data.error);
-      return null;
-    }
-
-    // New API returns a public audio_url; old implementation returned base64.
-    const audioUrl: string | null =
-      typeof data?.audio_url === 'string'
-        ? data.audio_url
-        : data?.audio
-          ? `data:${data.contentType || 'audio/wav'};base64,${data.audio}`
-          : null;
-
-    if (!audioUrl) {
-      console.error('TTS: No audio URL/data received:', data);
-      return null;
-    }
+    // Get audio as blob
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
 
     // Cache the audio URL
     audioCache.set(cacheKey, audioUrl);
 
     const audio = new Audio(audioUrl);
+    
+    // Clean up URL when audio ends
+    audio.onended = () => {
+      // Keep in cache, don't revoke
+    };
+
     await playAudioOrFallback(audio, text);
 
-    console.log('TTS: Audio played successfully');
+    console.log('TTS: ElevenLabs audio played successfully');
     return audio;
   } catch (err) {
     console.error('TTS: Service error:', err);
+    // Fallback to native TTS on any error
+    console.log('TTS: Falling back to native speech synthesis');
+    speakTextExclusively(text, { lang: 'pt-BR' });
     return null;
   }
 }
