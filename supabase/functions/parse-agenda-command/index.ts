@@ -119,13 +119,24 @@ function parseDaysFromText(text: string): string[] {
   return days;
 }
 
-// Get current date in Brazil timezone (UTC-3)
-function getBrazilDate(): Date {
-  const now = new Date();
-  // Brazil is UTC-3
-  const brazilOffset = -3 * 60; // -180 minutes
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utcTime + (brazilOffset * 60000));
+// Compute a reference "today" date using the CLIENT timezone to avoid server UTC drift.
+// client_tz_offset_minutes should match JS Date.getTimezoneOffset() (e.g. Brazil UTC-3 => 180).
+function getReferenceDate(clientNowIso?: string, clientTzOffsetMinutes?: number): Date {
+  try {
+    const now = clientNowIso ? new Date(clientNowIso) : new Date();
+
+    // Default to Brazil (UTC-3) when client doesn't send timezone
+    const tzOffset = typeof clientTzOffsetMinutes === 'number' && !Number.isNaN(clientTzOffsetMinutes)
+      ? clientTzOffsetMinutes
+      : 180;
+
+    // Convert "now" (UTC) to client-local time by subtracting the offset
+    // local = utc - offset
+    const localTimeMs = now.getTime() - (tzOffset * 60000);
+    return new Date(localTimeMs);
+  } catch {
+    return new Date();
+  }
 }
 
 function formatDateString(date: Date): string {
@@ -135,11 +146,11 @@ function formatDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function parseDateFromText(text: string): string | null {
+function parseDateFromText(text: string, ctx?: { clientNowIso?: string; clientTzOffsetMinutes?: number }): string | null {
   const normalized = normalizeText(text);
-  const today = getBrazilDate();
+  const today = getReferenceDate(ctx?.clientNowIso, ctx?.clientTzOffsetMinutes);
 
-  console.log('Brazil date/time:', today.toISOString(), 'formatted:', formatDateString(today));
+  console.log('Reference local date:', today.toISOString(), 'formatted:', formatDateString(today), 'tz_offset:', ctx?.clientTzOffsetMinutes);
 
   // "hoje"
   if (/\bhoje\b/.test(normalized)) {
@@ -275,7 +286,10 @@ serve(async (req) => {
   }
 
   try {
-    const { message } = await req.json();
+    const body = await req.json();
+    const message = body?.message;
+    const clientNowIso = body?.client_now_iso as string | undefined;
+    const clientTzOffsetMinutes = body?.client_tz_offset_minutes as number | undefined;
     
     if (!message || typeof message !== 'string') {
       return new Response(
@@ -323,7 +337,7 @@ serve(async (req) => {
     }
 
     // It's a lembrete
-    const data = parseDateFromText(message) || new Date().toISOString().split('T')[0];
+    const data = parseDateFromText(message, { clientNowIso, clientTzOffsetMinutes }) || formatDateString(getReferenceDate(clientNowIso, clientTzOffsetMinutes));
     const titulo = extractTitle(message);
     
     const result: ParsedResult = {

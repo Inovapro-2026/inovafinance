@@ -92,12 +92,15 @@ export default function Login() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { login, user, isLoading: authLoading } = useAuth();
 
   // Play login audio only once per session and only if user is NOT logged in
   const loginAudioPlayedRef = useRef(false);
   
   useEffect(() => {
+    // Wait auth state to settle; prevents audio playing during initial load while user is still being fetched
+    if (authLoading) return;
+
     // Don't play audio if user is already logged in
     if (user) {
       console.log('Login audio skipped: user already logged in');
@@ -123,7 +126,7 @@ export default function Login() {
     return () => {
       clearTimeout(timer);
     };
-  }, [user]);
+  }, [user, authLoading]);
   // Check biometric availability on mount
   useEffect(() => {
     const checkBiometric = async () => {

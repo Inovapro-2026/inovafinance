@@ -206,9 +206,14 @@ export default function AssistenteVoz() {
         return;
       }
 
-      // Call edge function to parse the command
+      // Call edge function to parse the command (send client time to avoid timezone drift)
+      const now = new Date();
       const { data, error } = await supabase.functions.invoke('parse-agenda-command', {
-        body: { message: command }
+        body: {
+          message: command,
+          client_now_iso: now.toISOString(),
+          client_tz_offset_minutes: now.getTimezoneOffset(),
+        }
       });
 
       if (error) throw error;
@@ -286,13 +291,20 @@ export default function AssistenteVoz() {
   const handleConsulta = async (tipo: 'hoje' | 'amanha' | 'semana') => {
     if (!user) return;
 
+    const formatLocalDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     const userMatricula = user.userId;
-    let targetDate = new Date();
+    const targetDate = new Date();
     if (tipo === 'amanha') {
       targetDate.setDate(targetDate.getDate() + 1);
     }
 
-    const dateStr = targetDate.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(targetDate);
     
     const { data: items } = await supabase
       .from('agenda_items')
@@ -317,10 +329,17 @@ export default function AssistenteVoz() {
 
   // Get date label
   const getDateLabel = (dateStr: string): string => {
+    const formatLocalDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     const today = getTodayDate();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const tomorrowStr = formatLocalDate(tomorrow);
 
     if (dateStr === today) return 'hoje';
     if (dateStr === tomorrowStr) return 'amanhã';
