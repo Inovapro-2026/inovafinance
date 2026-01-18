@@ -5,16 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Prefer a dedicated Google Cloud TTS key if present. Fallback to GEMINI_API_KEY if user reused it.
-const GOOGLE_TTS_API_KEY = Deno.env.get("GOOGLE_TTS_API_KEY") ?? Deno.env.get("INOVAFINANCE_TTS_API_KEY");
-const FALLBACK_API_KEY = Deno.env.get("GEMINI_API_KEY");
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -26,17 +17,18 @@ serve(async (req) => {
     const { text } = await req.json().catch(() => ({ text: "" }));
 
     if (!text || typeof text !== "string") {
-      return json(400, { error: "Text is required" });
+      return new Response(
+        JSON.stringify({ error: "Text is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const apiKey = GOOGLE_TTS_API_KEY ?? FALLBACK_API_KEY;
-    if (!apiKey) {
-      console.error("No Google TTS API key configured (GOOGLE_TTS_API_KEY / INOVAFINANCE_TTS_API_KEY / GEMINI_API_KEY)");
-      // Return 204 so the client can silently fallback to native voice without triggering runtime errors
+    if (!GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY not configured");
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    console.log("Gemini/Google TTS request for:", text.substring(0, 80));
+    console.log("Gemini 2.5 Flash TTS request for:", text.substring(0, 80));
 
     // Clean text for TTS
     const cleanText = text
@@ -45,52 +37,60 @@ serve(async (req) => {
       .replace(/\n+/g, ". ")
       .trim();
 
-    const ttsResponse = await fetch(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+    // Use Gemini 2.5 Flash Preview TTS model
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          input: { text: cleanText },
-          voice: {
-            languageCode: "pt-BR",
-            name: "pt-BR-Wavenet-A",
-            ssmlGender: "FEMALE",
-          },
-          audioConfig: {
-            audioEncoding: "MP3",
-            speakingRate: 1.0,
-            pitch: 0,
-          },
+          contents: [{
+            parts: [{ text: cleanText }]
+          }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: "Kore"
+                }
+              }
+            }
+          }
         }),
       }
     );
 
-    if (!ttsResponse.ok) {
-      const errorText = await ttsResponse.text();
-      console.error("Google TTS API error:", errorText);
-      // Do NOT return 500 (it surfaces as a runtime error). Return 204 so the client falls back to native TTS.
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error("Gemini TTS API error:", geminiResponse.status, errorText);
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    const ttsData = await ttsResponse.json();
-    if (!ttsData?.audioContent) {
-      console.error("Google TTS: missing audioContent");
+    const geminiData = await geminiResponse.json();
+    
+    // Extract audio from Gemini response
+    const audioData = geminiData?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    
+    if (!audioData?.data) {
+      console.error("Gemini TTS: no audio data in response", JSON.stringify(geminiData).substring(0, 500));
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // Decode base64 audio and return as binary
-    const audioBytes = Uint8Array.from(atob(ttsData.audioContent), (c) => c.charCodeAt(0));
+    // Decode base64 audio
+    const audioBytes = Uint8Array.from(atob(audioData.data), (c) => c.charCodeAt(0));
+    const mimeType = audioData.mimeType || "audio/mp3";
+
+    console.log("Gemini TTS success, audio size:", audioBytes.length, "type:", mimeType);
 
     return new Response(audioBytes, {
       headers: {
         ...corsHeaders,
-        "Content-Type": "audio/mpeg",
+        "Content-Type": mimeType,
       },
     });
   } catch (error) {
     console.error("gemini-tts unexpected error:", error);
-    // Silent fallback
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 });
