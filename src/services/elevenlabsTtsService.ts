@@ -1,5 +1,5 @@
-// ElevenLabs TTS Service for Brazilian Portuguese voice
-// Uses the text-to-speech edge function
+// InovaFinance TTS Service for Brazilian Portuguese voice
+// Uses the custom TTS API via edge function
 
 import { supabase } from '@/integrations/supabase/client';
 import { playAudioExclusively, stopAllAudio, isGlobalAudioPlaying } from './audioManager';
@@ -82,7 +82,7 @@ function cleanTextForTts(text: string): string {
 }
 
 /**
- * Speak text using ElevenLabs TTS with fallback to native TTS
+ * Speak text using InovaFinance TTS with fallback to native TTS
  */
 export async function speakWithElevenLabs(text: string): Promise<void> {
   const cleanText = cleanTextForTts(text);
@@ -108,18 +108,17 @@ export async function speakWithElevenLabs(text: string): Promise<void> {
       return speakWithNativeTts(cleanText);
     }
 
-    if (!data?.audio) {
-      // Check for quota exceeded or other API errors
+    if (!data?.audio_url) {
+      // Check for API errors
       if (data?.error) {
-        console.warn('ElevenLabs error, using native TTS:', data.error);
+        console.warn('TTS API error, using native TTS:', data.error);
         return speakWithNativeTts(cleanText);
       }
-      throw new Error('No audio data received');
+      throw new Error('No audio URL received');
     }
 
-    // Create audio element and play exclusively
-    const audioUrl = `data:audio/mpeg;base64,${data.audio}`;
-    const audio = new Audio(audioUrl);
+    // Create audio element and play exclusively from URL
+    const audio = new Audio(data.audio_url);
     
     return playAudioExclusively(audio);
   } catch (error) {

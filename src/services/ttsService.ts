@@ -10,7 +10,7 @@ export interface TTSResult {
 }
 
 /**
- * Text-to-Speech service using Hugging Face API via Edge Function
+ * Text-to-Speech service using InovaFinance TTS API via Edge Function
  * Converts text to audio and plays it
  */
 export async function speak(text: string): Promise<HTMLAudioElement | null> {
