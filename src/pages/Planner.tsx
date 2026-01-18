@@ -40,6 +40,7 @@ import {
   addSalaryCredit,
   checkAdvanceCredited,
   calculateDaysUntil,
+  getUnpaidPaymentsThisMonth,
   type ScheduledPayment 
 } from '@/lib/plannerDb';
 import { addTransaction, calculateBalance, getGoals } from '@/lib/db';
@@ -97,6 +98,7 @@ export default function Planner() {
   const [advanceAmountInput, setAdvanceAmountInput] = useState('');
   const [advanceDayInput, setAdvanceDayInput] = useState('');
   const [pendingPayment, setPendingPayment] = useState<ScheduledPayment | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<ScheduledPayment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // ISA greeting for Planner page
@@ -343,8 +345,52 @@ export default function Planner() {
     }
   };
 
-  const recurringPayments = payments.filter(p => p.isRecurring);
-  const oneTimePayments = payments.filter(p => !p.isRecurring);
+  // Filter to show only unpaid payments this month
+  const unpaidPayments = getUnpaidPaymentsThisMonth(payments);
+  const recurringPayments = unpaidPayments.filter(p => p.isRecurring);
+  const oneTimePayments = unpaidPayments.filter(p => !p.isRecurring);
+
+  // Handler for marking a payment as paid from the popup
+  const handleMarkAsPaid = async (payment: ScheduledPayment) => {
+    if (!user || !payment.id) return;
+
+    // Register as expense transaction
+    await addTransaction({
+      amount: payment.amount,
+      type: 'expense',
+      paymentMethod: 'debit',
+      category: payment.category,
+      description: payment.name,
+      date: new Date(),
+      userId: user.userId,
+    });
+
+    // Log the payment
+    await addPaymentLog({
+      userId: user.userId,
+      scheduledPaymentId: payment.id,
+      name: payment.name,
+      amount: payment.amount,
+      paidAt: new Date(),
+      paymentType: 'scheduled',
+    });
+
+    // Update last paid date
+    await updateScheduledPayment(payment.id, { lastPaidAt: new Date() });
+
+    // If it's a one-time payment, deactivate it
+    if (!payment.isRecurring) {
+      await deleteScheduledPayment(payment.id);
+    }
+
+    await refreshUser();
+    toast.success('Pagamento registrado!', {
+      description: `${payment.name} marcado como pago`
+    });
+    await isaSpeak(`${payment.name} de ${currencyToSpeech(payment.amount)} marcado como pago`, 'planner');
+    setSelectedPayment(null);
+    loadData();
+  };
 
   if (!user) {
     return (
@@ -564,6 +610,54 @@ export default function Planner() {
         )}
       </AnimatePresence>
 
+      {/* Selected Payment Popup (Mark as Paid) */}
+      <AnimatePresence>
+        {selectedPayment && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedPayment(null)}
+          >
+            <motion.div 
+              onClick={(e) => e.stopPropagation()}
+              initial={{ y: 50 }}
+              animate={{ y: 0 }}
+            >
+              <GlassCard className="w-full max-w-sm p-6">
+                <h3 className="text-lg font-bold mb-4 text-center">Marcar como Pago?</h3>
+                <div className="text-center mb-6">
+                  <span className="text-4xl mb-3 block">{CATEGORY_ICONS[selectedPayment.category] || '📋'}</span>
+                  <p className="font-semibold text-lg">{selectedPayment.name}</p>
+                  <p className="text-2xl font-bold text-primary mt-2">{formatCurrency(selectedPayment.amount)}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {selectedPayment.isRecurring ? `Todo dia ${selectedPayment.dueDay}` : 'Pagamento único'}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-12"
+                    onClick={() => setSelectedPayment(null)}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 h-12 bg-gradient-to-r from-green-500 to-emerald-500"
+                    onClick={() => handleMarkAsPaid(selectedPayment)}
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Paguei
+                  </Button>
+                </div>
+              </GlassCard>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Recurring Payments */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -576,12 +670,16 @@ export default function Planner() {
         
         {recurringPayments.length === 0 ? (
           <GlassCard className="p-6 text-center">
-            <p className="text-muted-foreground text-sm">Nenhum pagamento recorrente cadastrado</p>
+            <p className="text-muted-foreground text-sm">Nenhum pagamento pendente este mês</p>
           </GlassCard>
         ) : (
           <div className="space-y-2">
             {recurringPayments.map((payment) => (
-              <GlassCard key={payment.id} className="p-4">
+              <GlassCard 
+                key={payment.id} 
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]"
+                onClick={() => setSelectedPayment(payment)}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{CATEGORY_ICONS[payment.category] || '📋'}</span>
@@ -593,7 +691,10 @@ export default function Planner() {
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-destructive">{formatCurrency(payment.amount)}</p>
                     <button
-                      onClick={() => payment.id && handleDeletePayment(payment.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        payment.id && handleDeletePayment(payment.id);
+                      }}
                       className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -618,12 +719,16 @@ export default function Planner() {
         
         {oneTimePayments.length === 0 ? (
           <GlassCard className="p-6 text-center">
-            <p className="text-muted-foreground text-sm">Nenhum pagamento único cadastrado</p>
+            <p className="text-muted-foreground text-sm">Nenhum pagamento único pendente</p>
           </GlassCard>
         ) : (
           <div className="space-y-2">
             {oneTimePayments.map((payment) => (
-              <GlassCard key={payment.id} className="p-4">
+              <GlassCard 
+                key={payment.id} 
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]"
+                onClick={() => setSelectedPayment(payment)}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{CATEGORY_ICONS[payment.category] || '📋'}</span>
@@ -637,7 +742,10 @@ export default function Planner() {
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-destructive">{formatCurrency(payment.amount)}</p>
                     <button
-                      onClick={() => payment.id && handleDeletePayment(payment.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        payment.id && handleDeletePayment(payment.id);
+                      }}
                       className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />

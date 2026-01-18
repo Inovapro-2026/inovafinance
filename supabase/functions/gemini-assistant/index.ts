@@ -97,6 +97,15 @@ EXEMPLOS DE RESPOSTAS:
 - Pergunta sobre saldo: "Você tem R$ ${formatBRL(context.debitBalance)} disponível na conta! ${context.debitBalance > 500 ? '💪 Saldo saudável!' : 'Vamos cuidar bem dele!'}"
 - Pergunta sobre crédito: "Seu limite disponível no cartão é R$ ${formatBRL(context.creditLimit - context.creditUsed)} de um total de R$ ${formatBRL(context.creditLimit)}."`;
 
+    // Detect if this is a "mark as paid" request
+    const paidKeywords = ['paguei', 'pago', 'quitei', 'quitado', 'paga', 'já paguei', 'acabei de pagar'];
+    const isPaidRequest = paidKeywords.some(keyword => normalizedMessage.includes(keyword)) &&
+      context.scheduledPayments.some(p => 
+        normalizedMessage.includes(p.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+      );
+
+    console.log('Paid request detected:', isPaidRequest);
+
     // Define the transaction recording function
     const tools = [
       {
@@ -128,8 +137,33 @@ EXEMPLOS DE RESPOSTAS:
             required: ['amount', 'type', 'category', 'description']
           }
         }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'mark_payment_paid',
+          description: 'Marca uma conta/pagamento agendado como pago. Use quando o usuário diz que pagou uma conta específica (ex: "paguei aluguel", "paguei claro", "quitei a internet")',
+          parameters: {
+            type: 'object',
+            properties: {
+              paymentName: {
+                type: 'string',
+                description: 'Nome da conta/pagamento que foi pago (ex: aluguel, claro, tim, internet, luz, etc.)'
+              }
+            },
+            required: ['paymentName']
+          }
+        }
       }
     ];
+
+    // Determine tool choice
+    let toolChoice: 'auto' | { type: 'function'; function: { name: string } } = 'auto';
+    if (isPaidRequest) {
+      toolChoice = { type: 'function', function: { name: 'mark_payment_paid' } };
+    } else if (isTransactionRequest) {
+      toolChoice = { type: 'function', function: { name: 'record_transaction' } };
+    }
 
     const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
     if (!OPENROUTER_API_KEY) {
@@ -151,7 +185,7 @@ EXEMPLOS DE RESPOSTAS:
           { role: 'user', content: message }
         ],
         tools: tools,
-        tool_choice: isTransactionRequest ? { type: 'function', function: { name: 'record_transaction' } } : 'auto',
+        tool_choice: toolChoice,
         temperature: 0.7,
         max_tokens: 500
       })

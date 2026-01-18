@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateBalance, getTransactions, addTransaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/db';
-import { getScheduledPayments, getUserSalaryInfo, calculateMonthlySummary } from '@/lib/plannerDb';
+import { getScheduledPayments, getUserSalaryInfo, calculateMonthlySummary, updateScheduledPayment, addPaymentLog, findPaymentByName, getUnpaidPaymentsThisMonth } from '@/lib/plannerDb';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -506,6 +506,65 @@ export default function AI() {
       const data = response.data;
 
       if (data.error) throw new Error(data.error);
+
+      // Check if this is a mark payment as paid request
+      if (data.functionCall?.name === 'mark_payment_paid') {
+        const { args } = data.functionCall;
+        const paymentName = args.paymentName;
+        
+        // Get all scheduled payments and find the one to mark as paid
+        const allPayments = await getScheduledPayments(user.userId);
+        const unpaidPayments = getUnpaidPaymentsThisMonth(allPayments);
+        const foundPayment = findPaymentByName(unpaidPayments, paymentName);
+        
+        if (foundPayment && foundPayment.id) {
+          // Mark as paid by updating lastPaidAt
+          await updateScheduledPayment(foundPayment.id, { lastPaidAt: new Date() });
+          
+          // Add transaction for the payment
+          await addTransaction({
+            amount: foundPayment.amount,
+            type: 'expense',
+            paymentMethod: 'debit',
+            category: foundPayment.category,
+            description: foundPayment.name,
+            date: new Date(),
+            userId: user.userId,
+          });
+          
+          // Log the payment
+          await addPaymentLog({
+            userId: user.userId,
+            scheduledPaymentId: foundPayment.id,
+            name: foundPayment.name,
+            amount: foundPayment.amount,
+            paidAt: new Date(),
+            paymentType: 'scheduled',
+          });
+          
+          // If it's a one-time payment, deactivate it
+          if (!foundPayment.isRecurring) {
+            await updateScheduledPayment(foundPayment.id, { isActive: false });
+          }
+          
+          await refreshUser();
+          
+          toast.success(`${foundPayment.name} marcado como pago!`, {
+            description: `R$ ${foundPayment.amount.toFixed(2)} registrado como despesa`
+          });
+          
+          speak(`Pronto! Marquei ${foundPayment.name} de ${foundPayment.amount.toFixed(0)} reais como pago. Já sumiu da sua lista de contas desse mês! 👍`);
+          
+          // Show expense animation
+          setShowExpenseAnimation(true);
+          setTimeout(() => showBalanceWithAnimation('decrease'), 3200);
+        } else {
+          speak(`Não encontrei nenhuma conta chamada "${paymentName}" na sua lista de pagamentos pendentes. Pode repetir o nome?`);
+        }
+        
+        setStatusText('Pronta para ajudar');
+        return;
+      }
 
       // Check if a transaction needs confirmation
       if (data.functionCall?.name === 'record_transaction') {

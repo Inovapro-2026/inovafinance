@@ -399,3 +399,57 @@ export function calculateDaysUntil(targetDay: number): number {
   
   return diffDays;
 }
+
+// Check if payment is already paid this month
+export function isPaymentPaidThisMonth(payment: ScheduledPayment): boolean {
+  if (!payment.lastPaidAt) return false;
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const lastPaidMonth = payment.lastPaidAt.toISOString().slice(0, 7);
+  return lastPaidMonth === currentMonth;
+}
+
+// Get unpaid payments for current month (for display in Planner)
+export function getUnpaidPaymentsThisMonth(payments: ScheduledPayment[]): ScheduledPayment[] {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  
+  return payments.filter(p => {
+    // Check if already paid this month
+    if (p.lastPaidAt) {
+      const lastPaidMonth = p.lastPaidAt.toISOString().slice(0, 7);
+      if (lastPaidMonth === currentMonth) return false;
+    }
+    
+    // If it's a one-time payment, check if it's for this month
+    if (!p.isRecurring && p.specificMonth) {
+      const paymentMonth = p.specificMonth.toISOString().slice(0, 7);
+      if (paymentMonth !== currentMonth) return false;
+    }
+    
+    return true;
+  });
+}
+
+// Find payment by name (fuzzy match for voice commands)
+export function findPaymentByName(payments: ScheduledPayment[], searchName: string): ScheduledPayment | null {
+  const normalized = searchName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  
+  // First try exact match
+  const exactMatch = payments.find(p => 
+    p.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === normalized
+  );
+  if (exactMatch) return exactMatch;
+  
+  // Then try partial match
+  const partialMatch = payments.find(p => 
+    p.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(normalized) ||
+    normalized.includes(p.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+  );
+  if (partialMatch) return partialMatch;
+  
+  // Try matching by category
+  const categoryMatch = payments.find(p => 
+    p.category.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(normalized)
+  );
+  
+  return categoryMatch || null;
+}
