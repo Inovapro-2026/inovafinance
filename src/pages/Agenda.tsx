@@ -105,7 +105,10 @@ function MiniCalendar({
   
   const getDateKey = (day: number) => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    return date.toISOString().split('T')[0];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
   
   const hasItems = (day: number) => {
@@ -273,18 +276,26 @@ export default function Agenda() {
     if (!user) return;
     
     const userMatricula = user.userId;
-    const dateStr = selectedDate.toISOString().split('T')[0];
+
+    const formatLocalDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const dateStr = formatLocalDate(selectedDate);
     const dayItems = await getAgendaItemsForDate(userMatricula, dateStr);
     setItems(dayItems);
-    
+
     // Load month overview for calendar dots
     const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
     const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-    
+
     const monthItems = await getAgendaItems(
       userMatricula,
-      startOfMonth.toISOString().split('T')[0],
-      endOfMonth.toISOString().split('T')[0]
+      formatLocalDate(startOfMonth),
+      formatLocalDate(endOfMonth)
     );
     
     const counts: Record<string, number> = {};

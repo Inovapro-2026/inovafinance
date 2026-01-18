@@ -321,7 +321,11 @@ export function getTodayDayOfWeek(): string {
 }
 
 export function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export function formatTime(time: string): string {
@@ -472,6 +476,14 @@ export function parseDaysFromText(text: string): string[] {
 
 export function parseDateFromText(text: string): string | null {
   const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const formatLocalDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const today = new Date();
 
   // "hoje"
@@ -483,14 +495,14 @@ export function parseDateFromText(text: string): string | null {
   if (/\bamanha\b/.test(normalized)) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    return formatLocalDate(tomorrow);
   }
 
   // "depois de amanha"
   if (/depois\s*de\s*amanha/.test(normalized)) {
     const dayAfter = new Date(today);
     dayAfter.setDate(dayAfter.getDate() + 2);
-    return dayAfter.toISOString().split('T')[0];
+    return formatLocalDate(dayAfter);
   }
 
   // Day of month pattern: "dia 15", "no dia 20"
@@ -503,7 +515,7 @@ export function parseDateFromText(text: string): string | null {
       if (date < today) {
         date.setMonth(date.getMonth() + 1);
       }
-      return date.toISOString().split('T')[0];
+      return formatLocalDate(date);
     }
   }
 
