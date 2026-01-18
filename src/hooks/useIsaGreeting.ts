@@ -131,9 +131,10 @@ export function useIsaGreeting({
             ? calculateDaysUntilDay(salaryInfo.salaryDay)
             : null;
 
+          // Use initialBalance (same as shown on screen) instead of calculated debitBalance
           message = generateHomeGreeting(
             userName,
-            balanceData.debitBalance,
+            initialBalance, // Changed from balanceData.debitBalance to match the UI
             todaySpent,
             paymentsDueToday,
             daysUntilSalary
